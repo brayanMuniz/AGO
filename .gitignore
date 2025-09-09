@@ -1,0 +1,5 @@
+gallery/
+raw_images/
+raw_txt_files/
+
+.DS_Store
