@@ -7,3 +7,5 @@ raw_txt_files/
 tmp/
 
 galleryDB.db
+
+.air.toml
