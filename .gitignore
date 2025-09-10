@@ -5,3 +5,5 @@ raw_txt_files/
 .DS_Store
 
 tmp/
+
+galleryDB.db
