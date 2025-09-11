@@ -9,3 +9,5 @@ tmp/
 galleryDB.db
 
 .air.toml
+
+notes.md

@@ -3,16 +3,24 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
 
-// InsertImageWithTags inserts the image and links it to its tags
-func InsertImageWithTags(db *sql.DB, phash, filename string, tags []string, tagCategoryMap map[string]string) error {
-	// Insert image
+var supportedExtensions = []string{".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+func InsertImageWithTags(db *sql.DB, phash string, tags []string, tagCategoryMap map[string]string, width, height int) error {
+	imagePath, err := FindImageFile(phash)
+	if err != nil {
+		return fmt.Errorf("image file not found for phash %s: %w", phash, err)
+	}
+
+	filename := filepath.Base(imagePath)
+
 	var imageID int64
-	imageInsertStmt := `INSERT INTO images (phash, filename) VALUES (?, ?)`
-	result, err := db.Exec(imageInsertStmt, phash, filename)
+	imageInsertStmt := `INSERT INTO images (phash, filename, width, height) VALUES (?, ?, ?, ?)`
+	result, err := db.Exec(imageInsertStmt, phash, filename, width, height)
 	if err != nil {
 		return fmt.Errorf("insert image: %w", err)
 	}
@@ -21,7 +29,6 @@ func InsertImageWithTags(db *sql.DB, phash, filename string, tags []string, tagC
 		return fmt.Errorf("get last insert ID: %w", err)
 	}
 
-	// For each tag: insert if missing, then link
 	for _, tag := range tags {
 		tag = sanitizeTag(tag)
 		if tag == "" {
@@ -62,9 +69,25 @@ func sanitizeTag(tag string) string {
 	return tag
 }
 
+// FindImageFile finds the first image file matching a phash with common extensions in the gallery folder.
+func FindImageFile(phash string) (string, error) {
+	extensions := []string{".jpeg", ".jpg", ".png", ".webp", ".gif"}
+
+	for _, ext := range extensions {
+		fullPath := filepath.Join("./gallery", phash+ext)
+		if _, err := os.Stat(fullPath); err == nil {
+			return fullPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("no matching image file found for %s", phash)
+}
+
 type ImageResult struct {
 	Phash    string `json:"phash"`
 	Filename string `json:"filename"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
 }
 
 func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
@@ -74,7 +97,7 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(tags)), ",")
 	query := fmt.Sprintf(`
-		SELECT images.phash, images.filename
+		SELECT images.phash, images.filename, images.width, images.height
 		FROM images
 		JOIN image_tags ON images.id = image_tags.image_id
 		JOIN tags ON tags.id = image_tags.tag_id
@@ -99,7 +122,7 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	var results []ImageResult
 	for rows.Next() {
 		var img ImageResult
-		if err := rows.Scan(&img.Phash, &img.Filename); err != nil {
+		if err := rows.Scan(&img.Phash, &img.Filename, &img.Width, &img.Height); err != nil {
 			return nil, err
 		}
 		results = append(results, img)

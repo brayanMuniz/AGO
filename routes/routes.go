@@ -12,6 +12,7 @@ func SetupRouter(database *sql.DB) *gin.Engine {
 	api := r.Group("/api")
 
 	RegisterImageRoutes(api, database)
+	RegisterCategoriesRoute(api, database)
 
 	return r
 }

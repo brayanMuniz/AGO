@@ -23,7 +23,9 @@ func createStartingTables(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS images (
 	    id INTEGER PRIMARY KEY AUTOINCREMENT,
 	    phash TEXT UNIQUE NOT NULL,
-	    filename TEXT
+	    filename TEXT,
+	    width INTEGER,
+	    height INTEGER
 	);
 
 	CREATE TABLE IF NOT EXISTS tags (
