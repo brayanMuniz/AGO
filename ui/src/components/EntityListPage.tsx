@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import EntityCard from "./EntityCard";
-import Sidebar from "./Sidebar";
+import Sidebar from "./SideBar";
 import MobileNav from "./MobileNav";
 
 interface Entity {
@@ -17,6 +17,7 @@ interface EntityListPageProps {
   favoriteApiEndpointPrefix: string;
   icon: string;
   entityLinkPrefix?: string;
+  responseKey?: string;
 }
 
 const EntityListPage: React.FC<EntityListPageProps> = ({
@@ -26,6 +27,7 @@ const EntityListPage: React.FC<EntityListPageProps> = ({
   favoriteApiEndpointPrefix,
   icon,
   entityLinkPrefix = "/tags",
+  responseKey = "tags",
 }) => {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ const EntityListPage: React.FC<EntityListPageProps> = ({
       try {
         const response = await fetch(listApiEndpoint);
         const data = await response.json();
-        setEntities(data[entityNamePlural.toLowerCase()] || []);
+        setEntities(data[responseKey] || []);
       } catch (err) {
         setError("Failed to load entities");
       } finally {

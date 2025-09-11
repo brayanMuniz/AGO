@@ -6,10 +6,11 @@ const AllTagsPage: React.FC = () => {
     <EntityListPage
       entityName="Tag"
       entityNamePlural="Tags"
-      listApiEndpoint="api/categories/tags"
+      listApiEndpoint="/api/categories/tags"
       favoriteApiEndpointPrefix="/api/user/favorite/tag" // Safe placeholder
       entityLinkPrefix="/tags"
       icon="🏷️"
+      responseKey="tags"
     />
   );
 };
