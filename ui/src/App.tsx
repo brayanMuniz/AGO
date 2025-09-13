@@ -17,14 +17,19 @@ function App() {
     <div className="min-h-screen bg-gray-900">
       <Routes>
         <Route path="/" element={<Home />} />
+
         <Route path="/tags" element={<AllTagsPage />} />
         <Route path="/tags/:tag" element={<TagPage />} />
+
         <Route path="/artists" element={<AllArtistsPage />} />
         <Route path="/artists/:artist" element={<ArtistPage />} />
+
         <Route path="/characters" element={<AllCharactersPage />} />
         <Route path="/characters/:character" element={<CharacterPage />} />
+
         <Route path="/series" element={<AllSeriesPage />} />
         <Route path="/series/:series" element={<SeriesPage />} />
+
       </Routes>
     </div>
   );

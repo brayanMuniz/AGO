@@ -17,7 +17,6 @@ func InitDB(filepath string) (*sql.DB, error) {
 	return database, nil
 }
 
-// Create images, tags and image_tags tables
 func createStartingTables(db *sql.DB) error {
 	_, err := db.Exec(`
 	CREATE TABLE IF NOT EXISTS images (
@@ -25,13 +24,17 @@ func createStartingTables(db *sql.DB) error {
 	    phash TEXT UNIQUE NOT NULL,
 	    filename TEXT,
 	    width INTEGER,
-	    height INTEGER
+	    height INTEGER,
+	    rating INTEGER DEFAULT 0 CHECK (rating BETWEEN 0 AND 5),
+	    favorite BOOLEAN DEFAULT FALSE,
+	    like_count INTEGER DEFAULT 0
 	);
 
 	CREATE TABLE IF NOT EXISTS tags (
 	    id INTEGER PRIMARY KEY AUTOINCREMENT,
 	    name TEXT UNIQUE NOT NULL,
-	    category TEXT
+	    category TEXT,
+	    favorite BOOLEAN DEFAULT FALSE
 	);
 
 	CREATE TABLE IF NOT EXISTS image_tags (
@@ -40,6 +43,20 @@ func createStartingTables(db *sql.DB) error {
 	    PRIMARY KEY (image_id, tag_id),
 	    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE,
 	    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS albums (
+	    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	    name TEXT NOT NULL UNIQUE,
+	    description TEXT
+	);
+
+	CREATE TABLE IF NOT EXISTS album_images (
+	    album_id INTEGER NOT NULL,
+	    image_id INTEGER NOT NULL,
+	    PRIMARY KEY (album_id, image_id),
+	    FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE,
+	    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 	);
 
 	`)

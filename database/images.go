@@ -69,11 +69,27 @@ func sanitizeTag(tag string) string {
 	return tag
 }
 
-// FindImageFile finds the first image file matching a phash with common extensions in the gallery folder.
-func FindImageFile(phash string) (string, error) {
-	extensions := []string{".jpeg", ".jpg", ".png", ".webp", ".gif"}
+func UpdateImageFields(db *sql.DB, imageID int, updates map[string]any) error {
+	if len(updates) == 0 {
+		return nil
+	}
 
-	for _, ext := range extensions {
+	setClauses := []string{}
+	args := []any{}
+	for col, val := range updates {
+		setClauses = append(setClauses, fmt.Sprintf("%s = ?", col))
+		args = append(args, val)
+	}
+	args = append(args, imageID)
+
+	query := fmt.Sprintf("UPDATE images SET %s WHERE id = ?", strings.Join(setClauses, ", "))
+	_, err := db.Exec(query, args...)
+	return err
+}
+
+// finds the first image file matching a phash with common extensions in the gallery folder.
+func FindImageFile(phash string) (string, error) {
+	for _, ext := range supportedExtensions {
 		fullPath := filepath.Join("./gallery", phash+ext)
 		if _, err := os.Stat(fullPath); err == nil {
 			return fullPath, nil
@@ -84,10 +100,14 @@ func FindImageFile(phash string) (string, error) {
 }
 
 type ImageResult struct {
+	ID       int    `json:"id"`
 	Phash    string `json:"phash"`
 	Filename string `json:"filename"`
 	Width    int    `json:"width"`
 	Height   int    `json:"height"`
+	Favorite bool   `json:"favorite"`
+	Likes    int    `json:"likes"`
+	Rating   int    `json:"rating"`
 }
 
 func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
@@ -97,16 +117,23 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(tags)), ",")
 	query := fmt.Sprintf(`
-		SELECT images.phash, images.filename, images.width, images.height
-		FROM images
-		JOIN image_tags ON images.id = image_tags.image_id
-		JOIN tags ON tags.id = image_tags.tag_id
-		WHERE tags.name IN (%s)
-		GROUP BY images.id
-		HAVING COUNT(DISTINCT tags.name) = ?
+	SELECT 
+		images.id,
+		images.phash,
+		images.filename,
+		images.width,
+		images.height,
+		images.favorite,
+		images.like_count,
+		images.rating
+	FROM images
+	JOIN image_tags ON images.id = image_tags.image_id
+	JOIN tags ON tags.id = image_tags.tag_id
+	WHERE tags.name IN (%s)
+	GROUP BY images.id
+	HAVING COUNT(DISTINCT tags.name) = ?
 	`, placeholders)
 
-	// Arguments for IN clause + final count check
 	args := make([]any, len(tags)+1)
 	for i, tag := range tags {
 		args[i] = tag
@@ -122,7 +149,17 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	var results []ImageResult
 	for rows.Next() {
 		var img ImageResult
-		if err := rows.Scan(&img.Phash, &img.Filename, &img.Width, &img.Height); err != nil {
+		err := rows.Scan(
+			&img.ID,
+			&img.Phash,
+			&img.Filename,
+			&img.Width,
+			&img.Height,
+			&img.Favorite,
+			&img.Likes,
+			&img.Rating,
+		)
+		if err != nil {
 			return nil, err
 		}
 		results = append(results, img)
