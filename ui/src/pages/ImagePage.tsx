@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
+import TagEditModal from "../components/TagEditModal";
 
 interface ImageData {
   id: number;
@@ -21,6 +22,9 @@ const ImagePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
 
   useEffect(() => {
     const fetchImage = async () => {
@@ -112,6 +116,84 @@ const ImagePage: React.FC = () => {
     if (imageData) {
       updateField("like_count", imageData.likes + 1);
     }
+  };
+
+  const handleAddTag = async (tag: string, category: string) => {
+    if (!imageData || isUpdating) return;
+
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/images/${id}/tags`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tag, category }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add tag: ${response.status}`);
+      }
+
+      // Update local state
+      setImageData(prev => {
+        if (!prev) return null;
+        const newTags = { ...prev.tags };
+        if (!newTags[category]) {
+          newTags[category] = [];
+        }
+        if (!newTags[category].includes(tag)) {
+          newTags[category] = [...newTags[category], tag];
+        }
+        return { ...prev, tags: newTags };
+      });
+
+      console.log(`Tag "${tag}" added to ${category}`);
+    } catch (error) {
+      console.error("Error adding tag:", error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRemoveTag = async (tag: string) => {
+    if (!imageData || isUpdating) return;
+
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/images/${id}/tags`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tag }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to remove tag: ${response.status}`);
+      }
+
+      // Update local state
+      setImageData(prev => {
+        if (!prev) return null;
+        const newTags = { ...prev.tags };
+        Object.keys(newTags).forEach(category => {
+          newTags[category] = newTags[category].filter(t => t !== tag);
+        });
+        return { ...prev, tags: newTags };
+      });
+
+      console.log(`Tag "${tag}" removed`);
+    } catch (error) {
+      console.error("Error removing tag:", error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const openAddTagModal = (category: string) => {
+    setSelectedCategory(category);
+    setModalOpen(true);
   };
 
   if (loading) {
@@ -237,36 +319,82 @@ const ImagePage: React.FC = () => {
 
               {/* Metadata Sidebar */}
               <div className="w-full lg:w-[48rem] bg-gray-800 rounded-lg p-4">
-                <h2 className="text-xl font-bold text-white mb-4">Image Details</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-white">Image Details</h2>
+                  <button
+                    onClick={() => setIsEditingTags(!isEditingTags)}
+                    className={`px-3 py-1 rounded text-sm transition ${
+                      isEditingTags 
+                        ? "bg-pink-600 hover:bg-pink-700 text-white" 
+                        : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                    }`}
+                  >
+                    {isEditingTags ? "Done Editing" : "Edit Tags"}
+                  </button>
+                </div>
 
-                {/* Tags by category - reordered */}
-                {Object.entries(imageData.tags)
-                  .filter(([category]) => category !== "rating" && category !== "year")
-                  .sort(([a], [b]) => {
-                    // Order: general (Tags) first, then character, then copyright (Series), then others
-                    const order = { general: 0, character: 1, copyright: 2 };
-                    const aOrder = order[a as keyof typeof order] ?? 3;
-                    const bOrder = order[b as keyof typeof order] ?? 3;
-                    return aOrder - bOrder;
-                  })
-                  .map(([category, tags]) => (
-                    <div key={category} className="mb-4">
-                      <h3 className="text-sm font-semibold text-gray-300 mb-2 capitalize">
-                        {category === "general" ? "Tags" : category === "character" ? "Character" : category === "copyright" ? "Series" : category === "uncategorized" ? "Uncategorized" : category}
-                      </h3>
-                      <div className="flex flex-wrap gap-1">
-                        {tags.map((tag, idx) => (
-                          <Link
-                            key={idx}
-                            to={`/tags/${encodeURIComponent(tag)}`}
-                            className="inline-block px-2 py-1 rounded text-xs transition bg-pink-600 hover:bg-pink-500 text-white"
-                          >
-                            {tag}
-                          </Link>
-                        ))}
+                {/* Tags by category - show all categories */}
+                {(() => {
+                  // Define all possible categories in order
+                  const allCategories = [
+                    { key: "general", name: "Tags" },
+                    { key: "character", name: "Character" },
+                    { key: "copyright", name: "Series" },
+                    { key: "artist", name: "Artist" },
+                    { key: "meta", name: "Meta" },
+                    { key: "uncategorized", name: "Uncategorized" }
+                  ];
+
+                  return allCategories.map(({ key, name }) => {
+                    const tags = imageData.tags[key] || [];
+                    return (
+                      <div key={key} className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-semibold text-gray-300">
+                            {name}
+                          </h3>
+                          {isEditingTags && (
+                            <button
+                              onClick={() => openAddTagModal(key)}
+                              className="text-pink-400 hover:text-pink-300 text-lg font-bold"
+                              title={`Add ${name.toLowerCase()} tag`}
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {tags.length > 0 ? (
+                            tags.map((tag, idx) => (
+                              isEditingTags ? (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleRemoveTag(tag)}
+                                  className="inline-block px-2 py-1 rounded text-xs transition bg-red-600 hover:bg-red-500 text-white"
+                                  title={`Remove ${tag}`}
+                                >
+                                  {tag} ×
+                                </button>
+                              ) : (
+                                <Link
+                                  key={idx}
+                                  to={`/tags/${encodeURIComponent(tag)}`}
+                                  className="inline-block px-2 py-1 rounded text-xs transition bg-pink-600 hover:bg-pink-500 text-white"
+                                >
+                                  {tag}
+                                </Link>
+                              )
+                            ))
+                          ) : (
+                            <span className="text-gray-500 text-sm italic">
+                              {isEditingTags ? "No tags - click + to add" : "No tags"}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  });
+                })()}
 
                 {/* Rating category */}
                 {imageData.tags.rating && imageData.tags.rating.length > 0 && (
@@ -306,6 +434,15 @@ const ImagePage: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Tag Edit Modal */}
+      <TagEditModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        category={selectedCategory}
+        onAddTag={handleAddTag}
+        existingTags={imageData ? Object.values(imageData.tags).flat() : []}
+      />
     </div>
   );
 };

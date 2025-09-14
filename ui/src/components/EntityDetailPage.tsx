@@ -5,6 +5,7 @@ import MobileNav from "../components/MobileNav";
 import GalleryView from "../components/GalleryView";
 
 interface BackendImageItem {
+  id: number;
   phash: string;
   filename: string;
   width: number;
@@ -57,8 +58,8 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
           throw new Error(errJson?.error || `HTTP ${res.status}`);
         }
         const json: BackendImageItem[] = await res.json();
-        const mapped: ImageItem[] = json.map((img, index) => ({
-          id: index,
+        const mapped: ImageItem[] = json.map((img) => ({
+          id: img.id,
           filename: img.filename,
           width: img.width,
           height: img.height,

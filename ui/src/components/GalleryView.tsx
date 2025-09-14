@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import Masonry from "react-masonry-css";
 
 interface ImageItem {
@@ -23,19 +24,20 @@ const breakpointColumnsObj = {
 
 const ImageMasonry: React.FC<ImageMasonryProps> = ({ images }) => {
   if (images.length === 0) {
-    return <div className="text-center text-gray-400 py-10">No images found.</div>;
+    return <div className="text-center text-gray-400 py-8">No images found.</div>;
   }
 
   return (
     <Masonry
       breakpointCols={breakpointColumnsObj}
-      className="flex w-auto gap-4"
+      className="flex w-auto gap-1"
       columnClassName="masonry-column"
     >
       {images.map((img) => (
-        <div
+        <Link
           key={img.id}
-          className="mb-4 break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md"
+          to={`/image/${img.id}`}
+          className="break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer"
         >
           <img
             src={`/api/images/file/${img.filename}`}
@@ -44,7 +46,7 @@ const ImageMasonry: React.FC<ImageMasonryProps> = ({ images }) => {
             loading="lazy"
             decoding="async"
           />
-        </div>
+        </Link>
       ))}
     </Masonry>
   );
