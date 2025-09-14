@@ -14,6 +14,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func GetImageByIDHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil || id < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image ID"})
+			return
+		}
+
+		img, err := database.GetImageByID(db, id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch image"})
+			return
+		}
+
+		if img == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, img)
+	}
+}
+
 func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		tagsParam := ctx.Query("tags")

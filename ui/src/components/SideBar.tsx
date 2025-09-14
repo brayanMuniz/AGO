@@ -5,8 +5,8 @@ interface SidebarProps { }
 
 const Sidebar: React.FC<SidebarProps> = () => (
   <aside
-    className="hidden lg:flex w-64 h-screen bg-gray-800 text-gray-200 
-    flex-col p-6 rounded-r-2xl fixed top-0 left-0 z-40"
+    className="hidden lg:flex w-48 h-screen bg-gray-800 text-gray-200 
+    flex-col p-4 rounded-r-2xl fixed top-0 left-0 z-40"
   >
     <Link to="/" className="hover:text-indigo-400 transition py-1">
 

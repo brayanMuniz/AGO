@@ -1,6 +1,7 @@
 import './App.css'
 
 import Home from "./pages/Home";
+import ImagePage from "./pages/ImagePage";
 import AllTagsPage from "./pages/AllTagsPage";
 import TagPage from "./pages/TagPage";
 import AllArtistsPage from "./pages/AllArtistsPage";
@@ -17,6 +18,8 @@ function App() {
     <div className="min-h-screen bg-gray-900">
       <Routes>
         <Route path="/" element={<Home />} />
+
+        <Route path="/image/:id" element={<ImagePage />} />
 
         <Route path="/tags" element={<AllTagsPage />} />
         <Route path="/tags/:tag" element={<TagPage />} />

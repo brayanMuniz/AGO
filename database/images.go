@@ -100,14 +100,16 @@ func FindImageFile(phash string) (string, error) {
 }
 
 type ImageResult struct {
-	ID       int    `json:"id"`
-	Phash    string `json:"phash"`
-	Filename string `json:"filename"`
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
-	Favorite bool   `json:"favorite"`
-	Likes    int    `json:"likes"`
-	Rating   int    `json:"rating"`
+	ID       int                 `json:"id"`
+	Phash    string              `json:"phash"`
+	Filename string              `json:"filename"`
+	Width    int                 `json:"width"`
+	Height   int                 `json:"height"`
+	Favorite bool                `json:"favorite"`
+	Likes    int                 `json:"likes"`
+	Rating   int                 `json:"rating"`
+	Tags     map[string][]string `json:"tags"` // Grouped by category
+
 }
 
 func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
@@ -166,6 +168,66 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	}
 
 	return results, nil
+}
+
+func GetImageByID(db *sql.DB, id int) (*ImageResult, error) {
+	query := `
+		SELECT id, phash, filename, width, height, favorite, rating, like_count
+		FROM images
+		WHERE id = ?
+	`
+
+	row := db.QueryRow(query, id)
+
+	var img ImageResult
+	if err := row.Scan(&img.ID, &img.Phash, &img.Filename, &img.Width, &img.Height, &img.Favorite, &img.Rating, &img.Likes); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // not found
+		}
+		return nil, fmt.Errorf("failed to get image: %w", err)
+	}
+
+	tags, err := GetTagsByImageID(db, img.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags: %w", err)
+	}
+	img.Tags = tags
+
+	return &img, nil
+}
+
+func GetTagsByImageID(db *sql.DB, imageID int) (map[string][]string, error) {
+	query := `
+		SELECT tags.name, tags.category
+		FROM tags
+		JOIN image_tags ON tags.id = image_tags.tag_id
+		WHERE image_tags.image_id = ?
+	`
+
+	rows, err := db.Query(query, imageID)
+	if err != nil {
+		return nil, fmt.Errorf("query tags for image: %w", err)
+	}
+	defer rows.Close()
+
+	tagsByCategory := make(map[string][]string)
+
+	for rows.Next() {
+		var name string
+		var category sql.NullString
+		if err := rows.Scan(&name, &category); err != nil {
+			return nil, fmt.Errorf("scan tag: %w", err)
+		}
+
+		cat := "uncategorized"
+		if category.Valid && category.String != "" {
+			cat = category.String
+		}
+
+		tagsByCategory[cat] = append(tagsByCategory[cat], name)
+	}
+
+	return tagsByCategory, nil
 }
 
 func ImageExists(db *sql.DB, phash string) (bool, error) {
