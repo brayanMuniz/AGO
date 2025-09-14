@@ -17,6 +17,13 @@ func RegisterImageRoutes(r *gin.RouterGroup, db *sql.DB) {
 
 		imageGroup.GET("/:id", handlers.GetImageByIDHandler(db))
 
+		imageUpdateGroup := imageGroup.Group("/:id")
+		{
+			// Tag management
+			imageUpdateGroup.POST("/tags", handlers.AddTagToImageHandler(db))
+			imageUpdateGroup.DELETE("/tags", handlers.RemoveTagFromImageHandler(db))
+		}
+
 	}
 
 	imageUpdateGroup := imageGroup.Group("/:id")

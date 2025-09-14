@@ -111,6 +111,61 @@ func UpdateSingleImageFieldHandler[T any](db *sql.DB, fieldName string) gin.Hand
 	}
 }
 
+func AddTagToImageHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		imageID, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image ID"})
+			return
+		}
+
+		var body struct {
+			Tag      string `json:"tag"`
+			Category string `json:"category"`
+		}
+
+		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Tag) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tag and category are required"})
+			return
+		}
+
+		err = database.AddTagToImage(db, imageID, body.Tag, body.Category)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "tag added", "tag": body.Tag})
+	}
+}
+
+func RemoveTagFromImageHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		imageID, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image ID"})
+			return
+		}
+
+		var body struct {
+			Tag string `json:"tag"`
+		}
+
+		if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Tag) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tag is required"})
+			return
+		}
+
+		err = database.RemoveTagFromImage(db, imageID, body.Tag)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "tag removed", "tag": body.Tag})
+	}
+}
+
 // moves images with raw file names to gallery
 func OrganizeImagesHandler() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
