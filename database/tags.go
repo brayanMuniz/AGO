@@ -11,16 +11,18 @@ type Tag struct {
 	Name       string `json:"name"`
 	Category   string `json:"category"`
 	ImageCount int    `json:"imageCount"`
+	IsFavorite bool   `json:"isFavorite"`
 }
 
 func GetTagsByCategory(db *sql.DB, category string) ([]Tag, error) {
 	rows, err := db.Query(`
         SELECT t.id, t.name, t.category,
-               COUNT(it.image_id) as image_count
+               COUNT(it.image_id) as image_count,
+               COALESCE(t.favorite, false) as is_favorite
         FROM tags t
         LEFT JOIN image_tags it ON t.id = it.tag_id
         WHERE t.category = ?
-        GROUP BY t.id, t.name, t.category
+        GROUP BY t.id, t.name, t.category, t.favorite
         ORDER BY t.name
     `, category)
 	if err != nil {
@@ -31,7 +33,7 @@ func GetTagsByCategory(db *sql.DB, category string) ([]Tag, error) {
 	var tags []Tag
 	for rows.Next() {
 		var tg Tag
-		if err := rows.Scan(&tg.ID, &tg.Name, &tg.Category, &tg.ImageCount); err != nil {
+		if err := rows.Scan(&tg.ID, &tg.Name, &tg.Category, &tg.ImageCount, &tg.IsFavorite); err != nil {
 			return nil, err
 		}
 		tags = append(tags, tg)

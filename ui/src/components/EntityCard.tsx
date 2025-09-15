@@ -17,13 +17,19 @@ interface EntityCardProps {
 
 const EntityCard: React.FC<EntityCardProps> = ({ entity, onToggleFavorite, linkPrefix }) => {
   return (
-    <Link to={`${linkPrefix}/${encodeURIComponent(entity.name)}`} className="bg-gray-800 rounded-lg p-4 flex flex-col justify-between shadow-lg transition-transform hover:scale-105">
+    <div className="bg-gray-800 rounded-lg p-4 flex flex-col justify-between shadow-lg">
       <div className="flex justify-between items-start mb-3">
-        <h3 className="text-lg text-gray-100 font-semibold">{entity.name}</h3>
+        <Link 
+          to={`${linkPrefix}/${encodeURIComponent(entity.name)}`}
+          className="text-lg text-gray-100 font-semibold hover:text-blue-400 transition-colors"
+        >
+          {entity.name}
+        </Link>
         <button
           onClick={() => onToggleFavorite(entity.id, entity.isFavorite ?? false)}
-          className={`text-xl transition-colors ${entity.isFavorite ? "text-red-500" : "text-gray-500"
-            }`}
+          className={`text-xl transition-colors cursor-pointer hover:text-red-400 ${
+            entity.isFavorite ? "text-red-500" : "text-gray-500"
+          }`}
           title={entity.isFavorite ? "Unfavorite" : "Favorite"}
         >
           {entity.isFavorite ? "♥" : "♡"}
@@ -36,7 +42,7 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, onToggleFavorite, linkP
           {entity.imageCount}
         </p>
       )}
-    </Link>
+    </div>
   );
 };
 

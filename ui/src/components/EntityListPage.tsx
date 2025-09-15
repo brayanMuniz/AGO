@@ -71,13 +71,10 @@ const EntityListPage: React.FC<EntityListPageProps> = ({
     }
   };
 
-  const filteredEntities = useMemo(() => {
+  const { favoriteEntities, regularEntities } = useMemo(() => {
     let filtered = [...entities];
 
-    if (filters.showFavoritesOnly) {
-      filtered = filtered.filter((e) => e.isFavorite);
-    }
-
+    // Apply min image count filter
     if (filters.minImageCount) {
       const min = parseInt(filters.minImageCount, 10);
       if (!isNaN(min)) {
@@ -85,13 +82,25 @@ const EntityListPage: React.FC<EntityListPageProps> = ({
       }
     }
 
-    filtered.sort((a, b) =>
+    // Separate favorites and regular entities
+    const favorites = filtered.filter((e) => e.isFavorite);
+    const regular = filtered.filter((e) => !e.isFavorite);
+
+    // Sort both groups
+    const sortFn = (a: Entity, b: Entity) =>
       sortOrder === "asc"
         ? a.name.localeCompare(b.name)
-        : b.name.localeCompare(a.name)
-    );
+        : b.name.localeCompare(a.name);
 
-    return filtered;
+    favorites.sort(sortFn);
+    regular.sort(sortFn);
+
+    // If showing favorites only, return only favorites in regular section
+    if (filters.showFavoritesOnly) {
+      return { favoriteEntities: [], regularEntities: favorites };
+    }
+
+    return { favoriteEntities: favorites, regularEntities: regular };
   }, [entities, filters, sortOrder]);
 
   if (loading) {
@@ -163,20 +172,53 @@ const EntityListPage: React.FC<EntityListPageProps> = ({
             </select>
           </div>
 
-          {filteredEntities.length === 0 ? (
+          {favoriteEntities.length === 0 && regularEntities.length === 0 ? (
             <div className="text-center text-gray-400">
               No {entityNamePlural.toLowerCase()} found.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredEntities.map((entity) => (
-                <EntityCard
-                  key={entity.id}
-                  entity={entity}
-                  onToggleFavorite={handleToggleFavorite}
-                  linkPrefix={entityLinkPrefix}
-                />
-              ))}
+            <div className="space-y-8">
+              {/* Favorites Section */}
+              {favoriteEntities.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <h2 className="text-xl font-semibold text-yellow-400">⭐ Favorites</h2>
+                    <span className="text-sm text-gray-400">({favoriteEntities.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {favoriteEntities.map((entity) => (
+                      <EntityCard
+                        key={entity.id}
+                        entity={entity}
+                        onToggleFavorite={handleToggleFavorite}
+                        linkPrefix={entityLinkPrefix}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Regular Entities Section */}
+              {regularEntities.length > 0 && (
+                <div>
+                  {favoriteEntities.length > 0 && (
+                    <div className="flex items-center gap-2 mb-4">
+                      <h2 className="text-xl font-semibold text-gray-300">All {entityNamePlural}</h2>
+                      <span className="text-sm text-gray-400">({regularEntities.length})</span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {regularEntities.map((entity) => (
+                      <EntityCard
+                        key={entity.id}
+                        entity={entity}
+                        onToggleFavorite={handleToggleFavorite}
+                        linkPrefix={entityLinkPrefix}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>

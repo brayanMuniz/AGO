@@ -14,6 +14,7 @@ func SetupRouter(database *sql.DB) *gin.Engine {
 	RegisterImageRoutes(api, database)
 	RegisterCategoriesRoute(api, database)
 	RegisterAlbumRoutes(api, database)
+	RegisterUserRoutes(api, database)
 
 	return r
 }

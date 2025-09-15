@@ -452,7 +452,7 @@ const AlbumsPage: React.FC = () => {
                       {album.type}
                     </span>
                   </div>
-                  <div className="w-full h-48 bg-gray-700 rounded mb-3 flex items-center justify-center overflow-hidden relative">
+                  <div className="w-full h-64 bg-gray-700 rounded mb-3 flex items-center justify-center overflow-hidden relative">
                     {album.cover_image_id && coverImages[album.id] ? (
                       <img
                         src={`/api/images/file/${coverImages[album.id]}`}
