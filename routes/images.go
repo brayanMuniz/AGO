@@ -32,8 +32,6 @@ func RegisterImageRoutes(r *gin.RouterGroup, db *sql.DB) {
 		imageUpdateGroup.POST("/favorite", handlers.UpdateSingleImageFieldHandler[bool](db, "favorite"))
 		imageUpdateGroup.POST("/rate", handlers.UpdateSingleImageFieldHandler[int](db, "rating"))
 
-		// imageUpdateGroup.POST("/albums/:albumId", handlers.AddImageToAlbumHandler(db))
-		// imageUpdateGroup.DELETE("/albums/:albumId", handlers.RemoveImageFromAlbumHandler(db))
 	}
 
 }

@@ -47,17 +47,27 @@ func createStartingTables(db *sql.DB) error {
 
 	CREATE TABLE IF NOT EXISTS albums (
 	    id INTEGER PRIMARY KEY AUTOINCREMENT,
-	    name TEXT NOT NULL UNIQUE,
-	    description TEXT
+	    name TEXT NOT NULL,
+	    type TEXT CHECK(type IN ('manual', 'smart')) NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS album_images (
-	    album_id INTEGER NOT NULL,
-	    image_id INTEGER NOT NULL,
+	    album_id INTEGER,
+	    image_id INTEGER,
 	    PRIMARY KEY (album_id, image_id),
 	    FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE,
 	    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 	);
+
+	CREATE TABLE IF NOT EXISTS smart_album_filters (
+	    album_id INTEGER PRIMARY KEY,
+	    include_tag_ids TEXT,   
+	    exclude_tag_ids TEXT,   
+	    min_rating INTEGER,    
+	    favorite_only BOOLEAN,
+	    FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE
+	);
+
 
 	`)
 	return err
