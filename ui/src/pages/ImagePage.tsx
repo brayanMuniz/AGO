@@ -341,6 +341,7 @@ const ImagePage: React.FC = () => {
                     { key: "character", name: "Character" },
                     { key: "copyright", name: "Series" },
                     { key: "artist", name: "Artist" },
+                    { key: "rating", name: "Rating" },
                     { key: "meta", name: "Meta" },
                     { key: "uncategorized", name: "Uncategorized" }
                   ];

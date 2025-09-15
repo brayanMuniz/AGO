@@ -10,8 +10,9 @@ import (
 func CreateAlbumHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input struct {
-			Name string `json:"name"`
-			Type string `json:"type"` // "manual" or "smart"
+			Name         string `json:"name"`
+			Type         string `json:"type"`           // "manual" or "smart"
+			CoverImageID *int   `json:"cover_image_id"` // Optional
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -19,7 +20,8 @@ func CreateAlbumHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		res, err := db.Exec("INSERT INTO albums (name, type) VALUES (?, ?)", input.Name, input.Type)
+		res, err := db.Exec("INSERT INTO albums (name, type, cover_image_id) VALUES (?, ?, ?)", input.Name, input.Type, input.CoverImageID)
+
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -120,6 +122,33 @@ func RemoveImageFromAlbumHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+func GetSmartAlbumFiltersHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		albumID := c.Param("id")
+
+		var filters struct {
+			IncludeTagIDs string `json:"include_tag_ids"`
+			ExcludeTagIDs string `json:"exclude_tag_ids"`
+			MinRating     int    `json:"min_rating"`
+			FavoriteOnly  bool   `json:"favorite_only"`
+		}
+
+		err := db.QueryRow(`
+			SELECT include_tag_ids, exclude_tag_ids, min_rating, favorite_only
+			FROM smart_album_filters 
+			WHERE album_id = ?`,
+			albumID,
+		).Scan(&filters.IncludeTagIDs, &filters.ExcludeTagIDs, &filters.MinRating, &filters.FavoriteOnly)
+
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(200, filters)
+	}
+}
+
 func UpdateSmartAlbumFiltersHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		albumID := c.Param("id")
@@ -129,6 +158,7 @@ func UpdateSmartAlbumFiltersHandler(db *sql.DB) gin.HandlerFunc {
 			ExcludeTagIDs string `json:"exclude_tag_ids"`
 			MinRating     int    `json:"min_rating"`
 			FavoriteOnly  bool   `json:"favorite_only"`
+			CoverImageID  *int   `json:"cover_image_id"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -136,6 +166,7 @@ func UpdateSmartAlbumFiltersHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Update smart album filters
 		_, err := db.Exec(`
 			UPDATE smart_album_filters 
 			SET include_tag_ids = ?, exclude_tag_ids = ?, min_rating = ?, favorite_only = ? 
@@ -148,13 +179,28 @@ func UpdateSmartAlbumFiltersHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Update cover image in albums table if provided
+		if input.CoverImageID != nil {
+			_, err = db.Exec(`
+				UPDATE albums 
+				SET cover_image_id = ? 
+				WHERE id = ?`,
+				input.CoverImageID, albumID,
+			)
+		}
+
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
 		c.Status(204)
 	}
 }
 
 func GetAlbumsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, name, type FROM albums")
+		rows, err := db.Query("SELECT id, name, type, cover_image_id FROM albums")
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -166,13 +212,28 @@ func GetAlbumsHandler(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var id int
 			var name, typ string
-			rows.Scan(&id, &name, &typ)
+			var coverImageID sql.NullInt64
+			rows.Scan(&id, &name, &typ, &coverImageID)
+
+			var coverID *int
+			if coverImageID.Valid {
+				tmp := int(coverImageID.Int64)
+				coverID = &tmp
+			}
 
 			albums = append(albums, map[string]any{
-				"id":   id,
-				"name": name,
-				"type": typ,
+				"id":             id,
+				"name":           name,
+				"type":           typ,
+				"cover_image_id": coverID,
 			})
+
+		}
+
+		// to not break front end
+		if albums == nil {
+			c.JSON(200, []map[string]any{})
+			return
 		}
 
 		c.JSON(200, albums)

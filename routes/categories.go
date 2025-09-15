@@ -15,6 +15,7 @@ func RegisterCategoriesRoute(r *gin.RouterGroup, db *sql.DB) {
 	categoryGroup.GET("/series", categoryHandler(db, "copyright"))
 	categoryGroup.GET("/characters", categoryHandler(db, "character"))
 	categoryGroup.GET("/artists", categoryHandler(db, "artist"))
+	categoryGroup.GET("/ratings", ratingsHandler())
 
 }
 
@@ -26,5 +27,17 @@ func categoryHandler(db *sql.DB, category string) gin.HandlerFunc {
 			return
 		}
 		ctx.JSON(200, gin.H{"tags": tags})
+	}
+}
+
+func ratingsHandler() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ratings := []map[string]interface{}{
+			{"id": 1, "name": "general", "category": "rating"},
+			{"id": 2, "name": "sensitive", "category": "rating"},
+			{"id": 3, "name": "questionable", "category": "rating"},
+			{"id": 4, "name": "explicit", "category": "rating"},
+		}
+		ctx.JSON(200, gin.H{"tags": ratings})
 	}
 }

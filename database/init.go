@@ -48,7 +48,9 @@ func createStartingTables(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS albums (
 	    id INTEGER PRIMARY KEY AUTOINCREMENT,
 	    name TEXT NOT NULL,
-	    type TEXT CHECK(type IN ('manual', 'smart')) NOT NULL
+	    type TEXT CHECK(type IN ('manual', 'smart')) NOT NULL,
+	    cover_image_id INTEGER,
+	    FOREIGN KEY (cover_image_id) REFERENCES images(id) ON DELETE SET NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS album_images (

@@ -2,6 +2,8 @@ import './App.css'
 
 import Home from "./pages/Home";
 import ImagePage from "./pages/ImagePage";
+import AlbumsPage from "./pages/AlbumsPage";
+import AlbumDetailPage from "./pages/AlbumDetailPage";
 import AllTagsPage from "./pages/AllTagsPage";
 import TagPage from "./pages/TagPage";
 import AllArtistsPage from "./pages/AllArtistsPage";
@@ -18,6 +20,9 @@ function App() {
     <div className="min-h-screen bg-gray-900">
       <Routes>
         <Route path="/" element={<Home />} />
+
+        <Route path="/albums" element={<AlbumsPage />} />
+        <Route path="/albums/:id" element={<AlbumDetailPage />} />
 
         <Route path="/image/:id" element={<ImagePage />} />
 

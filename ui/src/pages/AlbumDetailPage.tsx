@@ -1,0 +1,660 @@
+import React, { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import Sidebar from "../components/SideBar";
+import MobileNav from "../components/MobileNav";
+import GalleryView from "../components/GalleryView";
+
+interface BackendImageItem {
+  id: number;
+  phash: string;
+  filename: string;
+  width: number;
+  height: number;
+}
+
+interface ImageItem {
+  id: number;
+  filename: string;
+  width: number;
+  height: number;
+}
+
+interface Album {
+  id: number;
+  name: string;
+  type: string;
+  cover_image_id?: number | null;
+}
+
+const AlbumDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [album, setAlbum] = useState<Album | null>(null);
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSettingCover, setIsSettingCover] = useState(false);
+  const [isUpdatingCover, setIsUpdatingCover] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    includeTags: [] as number[],
+    excludeTags: [] as number[],
+    minRating: 0,
+    favoriteOnly: false,
+  });
+  const [allTags, setAllTags] = useState<any[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [includeTagSearch, setIncludeTagSearch] = useState("");
+  const [excludeTagSearch, setExcludeTagSearch] = useState("");
+
+  useEffect(() => {
+    const fetchAlbumData = async () => {
+      if (!id) {
+        setError("No album ID provided");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch album details
+        const albumResponse = await fetch(`/api/albums`);
+        if (!albumResponse.ok) {
+          throw new Error(`Failed to fetch albums: ${albumResponse.status}`);
+        }
+        const albums = await albumResponse.json();
+        const currentAlbum = albums.find((a: Album) => a.id === parseInt(id));
+        
+        if (!currentAlbum) {
+          throw new Error("Album not found");
+        }
+        setAlbum(currentAlbum);
+
+        // Fetch album images
+        const imagesResponse = await fetch(`/api/albums/${id}/images`);
+        if (!imagesResponse.ok) {
+          throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
+        }
+        const imageData: BackendImageItem[] = await imagesResponse.json();
+        
+        const mappedImages: ImageItem[] = Array.isArray(imageData) ? imageData.map((img) => ({
+          id: img.id,
+          filename: img.filename,
+          width: img.width,
+          height: img.height,
+        })) : [];
+        
+        setImages(mappedImages);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAlbumData();
+  }, [id]);
+
+  const handleSetCover = async (imageId: number) => {
+    if (!album || isUpdatingCover) return;
+
+    setIsUpdatingCover(true);
+    try {
+      if (album.type === "smart") {
+        // First, fetch current filters to preserve them
+        const filtersResponse = await fetch(`/api/albums/${album.id}/filters`);
+        let currentFilters = {
+          include_tag_ids: "",
+          exclude_tag_ids: "",
+          min_rating: 0,
+          favorite_only: false,
+        };
+
+        if (filtersResponse.ok) {
+          currentFilters = await filtersResponse.json();
+        }
+
+        // Update with current filters plus new cover image
+        const response = await fetch(`/api/albums/${album.id}/filters`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...currentFilters,
+            cover_image_id: imageId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update album cover");
+        }
+      } else {
+        // For manual albums, we need a direct album update endpoint
+        console.log("Manual album cover update not yet implemented in backend");
+        // Temporarily update the local state for UI feedback
+      }
+
+      setAlbum(prev => prev ? { ...prev, cover_image_id: imageId } : null);
+      setIsSettingCover(false);
+    } catch (error) {
+      console.error("Error setting cover:", error);
+    } finally {
+      setIsUpdatingCover(false);
+    }
+  };
+
+  const refreshAlbumImages = async () => {
+    if (!id) return;
+    
+    try {
+      const imagesResponse = await fetch(`/api/albums/${id}/images`);
+      if (!imagesResponse.ok) {
+        throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
+      }
+      const imageData: BackendImageItem[] = await imagesResponse.json();
+      
+      const mappedImages: ImageItem[] = Array.isArray(imageData) ? imageData.map((img) => ({
+        id: img.id,
+        filename: img.filename,
+        width: img.width,
+        height: img.height,
+      })) : [];
+      
+      setImages(mappedImages);
+    } catch (error) {
+      console.error("Error refreshing album images:", error);
+    }
+  };
+
+  const fetchAllTags = async () => {
+    if (allTags.length > 0) return;
+    
+    setTagsLoading(true);
+    try {
+      const endpoints = [
+        { url: "/api/categories/tags", category: "general" },
+        { url: "/api/categories/artists", category: "artist" },
+        { url: "/api/categories/characters", category: "character" },
+        { url: "/api/categories/series", category: "copyright" },
+        { url: "/api/categories/ratings", category: "rating" },
+      ];
+
+      const responses = await Promise.all(
+        endpoints.map(endpoint => fetch(endpoint.url))
+      );
+
+      const allTagsData: any[] = [];
+      
+      for (let i = 0; i < responses.length; i++) {
+        if (responses[i].ok) {
+          const data = await responses[i].json();
+          const tags = data.tags || [];
+          tags.forEach((tag: any) => {
+            allTagsData.push({
+              id: tag.id,
+              name: tag.name,
+              category: endpoints[i].category,
+            });
+          });
+        }
+      }
+
+      setAllTags(allTagsData);
+    } catch (error) {
+      console.error("Failed to load tags:", error);
+    } finally {
+      setTagsLoading(false);
+    }
+  };
+
+  const handleUpdateAlbum = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!album) return;
+
+    try {
+      if (album.type === "smart") {
+        const response = await fetch(`/api/albums/${album.id}/filters`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            include_tag_ids: editFormData.includeTags.join(","),
+            exclude_tag_ids: editFormData.excludeTags.join(","),
+            min_rating: editFormData.minRating,
+            favorite_only: editFormData.favoriteOnly,
+            cover_image_id: album.cover_image_id,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update smart album");
+        }
+
+        // Refresh album images after updating filters
+        await refreshAlbumImages();
+      }
+
+      // Update album name would require a separate endpoint
+      setAlbum(prev => prev ? { ...prev, name: editFormData.name } : null);
+      setShowEditForm(false);
+    } catch (error) {
+      console.error("Error updating album:", error);
+    }
+  };
+
+  const handleTagToggle = (tagId: number, field: "includeTags" | "excludeTags") => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: prev[field].includes(tagId)
+        ? prev[field].filter(id => id !== tagId)
+        : [...prev[field], tagId]
+    }));
+  };
+
+  const handleRatingClick = (starIndex: number) => {
+    const newRating = starIndex + 1;
+    const finalRating = editFormData.minRating === newRating ? 0 : newRating;
+    setEditFormData(prev => ({ ...prev, minRating: finalRating }));
+  };
+
+  const getSelectedTags = (tagIds: number[]) => {
+    return allTags.filter(tag => tagIds.includes(tag.id));
+  };
+
+  const getFilteredTags = (searchTerm: string) => {
+    if (!searchTerm) return allTags;
+    return allTags.filter(tag => 
+      tag.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  const openEditForm = async () => {
+    if (album) {
+      let formData = {
+        name: album.name,
+        includeTags: [] as number[],
+        excludeTags: [] as number[],
+        minRating: 0,
+        favoriteOnly: false,
+      };
+
+      // For smart albums, fetch existing filters
+      if (album.type === "smart") {
+        try {
+          // Load tags first
+          await fetchAllTags();
+          
+          // Fetch current filters
+          const filtersResponse = await fetch(`/api/albums/${album.id}/filters`);
+          if (filtersResponse.ok) {
+            const filters = await filtersResponse.json();
+            
+            // Parse comma-separated tag IDs
+            const parseTagIds = (tagString: string): number[] => {
+              if (!tagString || tagString.trim() === "") return [];
+              return tagString.split(",").map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            };
+            
+            formData = {
+              ...formData,
+              includeTags: parseTagIds(filters.include_tag_ids),
+              excludeTags: parseTagIds(filters.exclude_tag_ids),
+              minRating: filters.min_rating || 0,
+              favoriteOnly: filters.favorite_only || false,
+            };
+          }
+        } catch (error) {
+          console.error("Failed to load existing filters:", error);
+        }
+      }
+      
+      setEditFormData(formData);
+      setShowEditForm(true);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900">
+        <Sidebar />
+        <div className="lg:ml-64">
+          <MobileNav />
+          <main className="flex-1 p-6">
+            <div className="flex flex-col items-center justify-center min-h-96">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mb-4"></div>
+              <p className="text-gray-300">Loading album...</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900">
+        <Sidebar />
+        <div className="lg:ml-64">
+          <MobileNav />
+          <main className="flex-1 p-6">
+            <div className="flex flex-col items-center justify-center min-h-96">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-200 mb-4">Error Loading Album</h2>
+                <p className="text-red-400 mb-6">{error}</p>
+                <Link to="/albums" className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded transition">
+                  ← Back to Albums
+                </Link>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (!album) {
+    return (
+      <div className="min-h-screen bg-gray-900">
+        <Sidebar />
+        <div className="lg:ml-64">
+          <MobileNav />
+          <main className="flex-1 p-6">
+            <div className="flex flex-col items-center justify-center min-h-96">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-200 mb-4">Album Not Found</h2>
+                <p className="text-gray-400 mb-6">No album found with ID: {id}</p>
+                <Link to="/albums" className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded transition">
+                  ← Back to Albums
+                </Link>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-900 flex">
+      <Sidebar />
+      <div className="lg:ml-64 flex-1 flex flex-col">
+        <MobileNav />
+        <main className="flex-1 p-6 overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Link 
+                to="/albums" 
+                className="text-gray-400 hover:text-white transition"
+                title="Back to Albums"
+              >
+                ← 
+              </Link>
+              <h1 className="text-3xl font-bold text-gray-100">
+                📁 {album.name}
+              </h1>
+              <span className={`px-3 py-1 rounded text-sm ${
+                album.type === "smart" 
+                  ? "bg-purple-600 text-white" 
+                  : "bg-blue-600 text-white"
+              }`}>
+                {album.type}
+              </span>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsSettingCover(!isSettingCover)}
+                  disabled={isUpdatingCover || images.length === 0}
+                  className={`px-3 py-1 rounded text-sm transition ${
+                    isSettingCover 
+                      ? "bg-pink-600 hover:bg-pink-700 text-white" 
+                      : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title={images.length === 0 ? "No images available for cover" : "Click an image to set as cover"}
+                >
+                  {isUpdatingCover ? "Updating..." : "Set Cover"}
+                </button>
+                
+                <button
+                  onClick={openEditForm}
+                  className="px-3 py-1 rounded text-sm transition bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Edit Album
+                </button>
+              </div>
+            </div>
+            <div className="text-gray-400 text-sm">
+              {images.length} image{images.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+          
+          {/* Gallery with cover setting mode */}
+          {isSettingCover && images.length > 0 && (
+            <div className="mb-4 p-4 bg-blue-900 rounded-lg">
+              <p className="text-blue-200 text-sm mb-2">Click on an image to set it as the album cover</p>
+              <button
+                onClick={() => setIsSettingCover(false)}
+                className="text-blue-300 hover:text-white text-sm underline"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          
+          <div className={isSettingCover ? "cursor-pointer" : ""}>
+            <GalleryView 
+              images={images} 
+              onImageClick={isSettingCover ? handleSetCover : undefined}
+            />
+          </div>
+          
+          {/* Edit Album Modal */}
+          {showEditForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-white">
+                    Edit {album?.type === "smart" ? "Smart" : "Manual"} Album
+                  </h2>
+                  <button
+                    onClick={() => setShowEditForm(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <form onSubmit={handleUpdateAlbum} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-300">Album Name</label>
+                    <input
+                      type="text"
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  {album?.type === "smart" && (
+                    <>
+                      {/* Selected Tags Pills */}
+                      {(editFormData.includeTags.length > 0 || editFormData.excludeTags.length > 0) && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium mb-2 text-gray-300">Selected Tags</label>
+                          <div className="flex flex-wrap gap-2">
+                            {getSelectedTags(editFormData.includeTags).map(tag => (
+                              <span
+                                key={`include-${tag.id}`}
+                                className="inline-flex items-center px-2 py-1 rounded text-xs bg-green-600 text-white"
+                              >
+                                <span className="text-xs mr-1">[{tag.category}]</span>
+                                {tag.name}
+                                <button
+                                  type="button"
+                                  onClick={() => handleTagToggle(tag.id, "includeTags")}
+                                  className="ml-1 text-white hover:text-gray-200"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                            {getSelectedTags(editFormData.excludeTags).map(tag => (
+                              <span
+                                key={`exclude-${tag.id}`}
+                                className="inline-flex items-center px-2 py-1 rounded text-xs bg-red-600 text-white"
+                              >
+                                <span className="text-xs mr-1">[{tag.category}]</span>
+                                {tag.name}
+                                <button
+                                  type="button"
+                                  onClick={() => handleTagToggle(tag.id, "excludeTags")}
+                                  className="ml-1 text-white hover:text-gray-200"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">Include Tags</label>
+                        {tagsLoading ? (
+                          <div className="text-gray-400">Loading tags...</div>
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              placeholder="Search tags to include..."
+                              value={includeTagSearch}
+                              onChange={(e) => setIncludeTagSearch(e.target.value)}
+                              className="w-full px-3 py-2 mb-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                            <div className="max-h-40 overflow-y-auto bg-gray-700 rounded-lg p-3 space-y-1">
+                              {getFilteredTags(includeTagSearch).map(tag => (
+                                <label key={tag.id} className="flex items-center text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={editFormData.includeTags.includes(tag.id)}
+                                    onChange={() => handleTagToggle(tag.id, "includeTags")}
+                                    className="mr-2 w-4 h-4 text-indigo-600 bg-gray-600 border-gray-500 rounded focus:ring-indigo-500"
+                                  />
+                                  <span className="text-xs text-gray-400 mr-2">[{tag.category}]</span>
+                                  {tag.name}
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">Exclude Tags (Optional)</label>
+                        {tagsLoading ? (
+                          <div className="text-gray-400">Loading tags...</div>
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              placeholder="Search tags to exclude..."
+                              value={excludeTagSearch}
+                              onChange={(e) => setExcludeTagSearch(e.target.value)}
+                              className="w-full px-3 py-2 mb-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                            <div className="max-h-40 overflow-y-auto bg-gray-700 rounded-lg p-3 space-y-1">
+                              {getFilteredTags(excludeTagSearch).map(tag => (
+                                <label key={tag.id} className="flex items-center text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={editFormData.excludeTags.includes(tag.id)}
+                                    onChange={() => handleTagToggle(tag.id, "excludeTags")}
+                                    className="mr-2 w-4 h-4 text-red-600 bg-gray-600 border-gray-500 rounded focus:ring-red-500"
+                                  />
+                                  <span className="text-xs text-gray-400 mr-2">[{tag.category}]</span>
+                                  {tag.name}
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">Minimum Rating</label>
+                        <div className="flex items-center gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => handleRatingClick(i)}
+                              className={`text-2xl transition-all duration-150 hover:scale-110 ${
+                                i < editFormData.minRating ? "text-yellow-400" : "text-gray-500"
+                              }`}
+                            >
+                              {i < editFormData.minRating ? "★" : "☆"}
+                            </button>
+                          ))}
+                          {editFormData.minRating > 0 && (
+                            <span className="ml-2 text-sm text-gray-400">{editFormData.minRating}+ stars</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center">
+                        <label className="flex items-center text-sm text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={editFormData.favoriteOnly}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, favoriteOnly: e.target.checked }))}
+                            className="mr-2 w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+                          />
+                          Favorites Only
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition"
+                    >
+                      Update Album
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditForm(false)}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+          
+          {images.length === 0 && (
+            <div className="text-center text-gray-400 py-10">
+              <div className="text-6xl mb-4">📁</div>
+              <h3 className="text-xl mb-2">No images in this album</h3>
+              <p className="text-sm">
+                {album.type === "manual" 
+                  ? "Add images to this album from the image detail pages." 
+                  : "This smart album's filters don't match any images yet."}
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default AlbumDetailPage;
