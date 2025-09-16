@@ -14,6 +14,92 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse query parameters
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+		sortBy := c.DefaultQuery("sort", "random")
+		
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 100 {
+			limit = 20
+		}
+		
+		offset := (page - 1) * limit
+		
+		// Build query based on sort parameter
+		var orderBy string
+		switch sortBy {
+		case "date_asc":
+			orderBy = "ORDER BY id ASC"
+		case "date_desc":
+			orderBy = "ORDER BY id DESC"
+		case "rating_desc":
+			orderBy = "ORDER BY rating DESC, id DESC"
+		case "rating_asc":
+			orderBy = "ORDER BY rating ASC, id ASC"
+		case "likes_desc":
+			orderBy = "ORDER BY like_count DESC, id DESC"
+		case "likes_asc":
+			orderBy = "ORDER BY like_count ASC, id ASC"
+		case "random":
+			orderBy = "ORDER BY RANDOM()"
+		default:
+			orderBy = "ORDER BY RANDOM()"
+		}
+		
+		// Get total count
+		var totalCount int
+		countQuery := "SELECT COUNT(*) FROM images"
+		err := db.QueryRow(countQuery).Scan(&totalCount)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count images"})
+			return
+		}
+		
+		// Get images with pagination
+		query := fmt.Sprintf(`
+			SELECT id, phash, filename, width, height, favorite, like_count, rating
+			FROM images
+			%s
+			LIMIT ? OFFSET ?
+		`, orderBy)
+		
+		rows, err := db.Query(query, limit, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch images"})
+			return
+		}
+		defer rows.Close()
+		
+		var images []database.ImageResult
+		for rows.Next() {
+			var img database.ImageResult
+			err := rows.Scan(&img.ID, &img.Phash, &img.Filename, &img.Width, &img.Height, &img.Favorite, &img.Likes, &img.Rating)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan image"})
+				return
+			}
+			images = append(images, img)
+		}
+		
+		totalPages := (totalCount + limit - 1) / limit
+		
+		c.JSON(http.StatusOK, gin.H{
+			"images": images,
+			"pagination": gin.H{
+				"current_page": page,
+				"total_pages":  totalPages,
+				"total_count":  totalCount,
+				"limit":        limit,
+			},
+		})
+	}
+}
+
 func GetImageByIDHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")

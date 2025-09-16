@@ -62,10 +62,11 @@ const ImagePage: React.FC = () => {
     if (!imageData || isUpdating) return;
 
     setIsUpdating(true);
-    const previousValue = (imageData as any)[field];
+    const displayField = field === 'like_count' ? 'likes' : field;
+    const previousValue = (imageData as any)[displayField];
 
-    // Optimistic update
-    setImageData(prev => prev ? { ...prev, [field]: value } : null);
+    // Optimistic update - handle likes field mapping
+    setImageData(prev => prev ? { ...prev, [displayField]: value } : null);
 
     try {
       // Map field names to API endpoints
@@ -92,8 +93,9 @@ const ImagePage: React.FC = () => {
       console.log(`${field} updated successfully:`, data);
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
-      // Revert optimistic update on error
-      setImageData(prev => prev ? { ...prev, [field]: previousValue } : null);
+      // Revert optimistic update on error - handle likes field mapping
+      const displayField = field === 'like_count' ? 'likes' : field;
+      setImageData(prev => prev ? { ...prev, [displayField]: previousValue } : null);
     } finally {
       setIsUpdating(false);
     }

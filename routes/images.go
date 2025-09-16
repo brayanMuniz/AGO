@@ -10,6 +10,7 @@ import (
 func RegisterImageRoutes(r *gin.RouterGroup, db *sql.DB) {
 	imageGroup := r.Group("/images")
 	{
+		imageGroup.GET("/", handlers.GetImagesHandler(db))
 		imageGroup.GET("/by-tags", handlers.GetImagesByTagsHandler(db))
 		imageGroup.GET("/file/:filename", handlers.ServeImageFileHandler())
 		imageGroup.POST("/organize", handlers.OrganizeImagesHandler())

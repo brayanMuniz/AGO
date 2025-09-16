@@ -132,9 +132,20 @@ const AlbumDetailPage: React.FC = () => {
           throw new Error("Failed to update album cover");
         }
       } else {
-        // For manual albums, we need a direct album update endpoint
-        console.log("Manual album cover update not yet implemented in backend");
-        // Temporarily update the local state for UI feedback
+        // For manual albums, use the direct album cover update endpoint
+        const response = await fetch(`/api/albums/${album.id}/cover`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            cover_image_id: imageId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update album cover");
+        }
       }
 
       setAlbum(prev => prev ? { ...prev, cover_image_id: imageId } : null);

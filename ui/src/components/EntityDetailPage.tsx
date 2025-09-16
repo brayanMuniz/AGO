@@ -40,6 +40,57 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSelectingImages, setIsSelectingImages] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
+  const [showAlbumModal, setShowAlbumModal] = useState(false);
+  const [manualAlbums, setManualAlbums] = useState<any[]>([]);
+
+  const handleImageSelect = (imageId: number) => {
+    if (!isSelectingImages) return;
+    
+    const newSelected = new Set(selectedImages);
+    if (newSelected.has(imageId)) {
+      newSelected.delete(imageId);
+    } else {
+      newSelected.add(imageId);
+    }
+    setSelectedImages(newSelected);
+  };
+
+  const fetchManualAlbums = async () => {
+    try {
+      const response = await fetch('/api/albums');
+      const albums = await response.json();
+      const manual = albums.filter((album: any) => album.type === 'manual');
+      setManualAlbums(manual);
+    } catch (error) {
+      console.error('Failed to fetch manual albums:', error);
+    }
+  };
+
+  const addImagesToAlbum = async (albumId: number) => {
+    try {
+      const imageIds = Array.from(selectedImages);
+      const response = await fetch(`/api/albums/${albumId}/images`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageIds }),
+      });
+      
+      if (response.ok) {
+        setSelectedImages(new Set());
+        setIsSelectingImages(false);
+        setShowAlbumModal(false);
+        // Show success message or refresh
+      } else {
+        console.error('Failed to add images to album');
+      }
+    } catch (error) {
+      console.error('Error adding images to album:', error);
+    }
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -111,13 +162,104 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       <div className="lg:ml-64 flex-1 flex flex-col">
         <MobileNav />
         <main className="flex-1 p-6 overflow-y-auto">
-          <h1 className="text-3xl font-bold text-gray-100 mb-4">{icon} {entityName}</h1>
-          <GalleryView images={images} />
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold text-gray-100">{icon} {entityName}</h1>
+            <button
+              onClick={() => {
+                if (isSelectingImages) {
+                  setIsSelectingImages(false);
+                  setSelectedImages(new Set());
+                } else {
+                  setIsSelectingImages(true);
+                }
+              }}
+              disabled={images.length === 0}
+              className={`px-4 py-2 rounded text-sm transition ${
+                isSelectingImages 
+                  ? "bg-pink-600 hover:bg-pink-700 text-white" 
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={images.length === 0 ? "No images available" : "Select images to add to album"}
+            >
+              {isSelectingImages ? "Cancel Selection" : "Add to Album"}
+            </button>
+          </div>
+          
+          {/* Selection mode instructions */}
+          {isSelectingImages && images.length > 0 && (
+            <div className="mb-4 p-4 bg-blue-900 rounded-lg">
+              <p className="text-blue-200 text-sm mb-2">Click on images to select them, then choose an album to add them to</p>
+              <div className="flex gap-2 items-center">
+                <span className="text-blue-300 text-sm">
+                  {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} selected
+                </span>
+                {selectedImages.size > 0 && (
+                  <button
+                    onClick={() => {
+                      fetchManualAlbums();
+                      setShowAlbumModal(true);
+                    }}
+                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition"
+                  >
+                    Choose Album
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <GalleryView 
+            images={images} 
+            isSelecting={isSelectingImages}
+            selectedImages={selectedImages}
+            onImageSelect={handleImageSelect}
+          />
           {images.length === 0 && (
             <div className="text-center text-gray-400 py-10">No images found for this {entityTypeSingular.toLowerCase()}.</div>
           )}
         </main>
       </div>
+      
+      {/* Album Selection Modal */}
+      {showAlbumModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-100 mb-4">
+              Add {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} to Album
+            </h3>
+            
+            <div className="max-h-60 overflow-y-auto mb-4">
+              {manualAlbums.length === 0 ? (
+                <p className="text-gray-400 text-center py-4">No manual albums found</p>
+              ) : (
+                <div className="space-y-2">
+                  {manualAlbums.map((album) => (
+                    <button
+                      key={album.id}
+                      onClick={() => addImagesToAlbum(album.id)}
+                      className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                    >
+                      <div className="font-semibold text-gray-100">{album.name}</div>
+                      <div className="text-sm text-gray-400">
+                        {album.imageCount || 0} images
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowAlbumModal(false)}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

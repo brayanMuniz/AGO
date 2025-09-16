@@ -200,7 +200,12 @@ func UpdateSmartAlbumFiltersHandler(db *sql.DB) gin.HandlerFunc {
 
 func GetAlbumsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, name, type, cover_image_id FROM albums")
+		rows, err := db.Query(`
+			SELECT a.id, a.name, a.type, a.cover_image_id, COUNT(ai.image_id) as image_count
+			FROM albums a
+			LEFT JOIN album_images ai ON a.id = ai.album_id
+			GROUP BY a.id, a.name, a.type, a.cover_image_id
+		`)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -213,7 +218,8 @@ func GetAlbumsHandler(db *sql.DB) gin.HandlerFunc {
 			var id int
 			var name, typ string
 			var coverImageID sql.NullInt64
-			rows.Scan(&id, &name, &typ, &coverImageID)
+			var imageCount int
+			rows.Scan(&id, &name, &typ, &coverImageID, &imageCount)
 
 			var coverID *int
 			if coverImageID.Valid {
@@ -226,6 +232,7 @@ func GetAlbumsHandler(db *sql.DB) gin.HandlerFunc {
 				"name":           name,
 				"type":           typ,
 				"cover_image_id": coverID,
+				"imageCount":     imageCount,
 			})
 
 		}
@@ -249,5 +256,97 @@ func DeleteAlbumHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		c.Status(204)
+	}
+}
+
+func UpdateAlbumCoverHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		albumIDStr := c.Param("id")
+		albumID, err := strconv.Atoi(albumIDStr)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid album ID"})
+			return
+		}
+
+		var input struct {
+			CoverImageID int `json:"cover_image_id"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		// Update cover image in albums table
+		_, err = db.Exec(`
+			UPDATE albums 
+			SET cover_image_id = ? 
+			WHERE id = ?`,
+			input.CoverImageID, albumID,
+		)
+
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update album cover"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Album cover updated successfully"})
+	}
+}
+
+func AddImagesToAlbumHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		albumIDStr := c.Param("id")
+		albumID, err := strconv.Atoi(albumIDStr)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid album ID"})
+			return
+		}
+
+		var input struct {
+			ImageIds []int `json:"imageIds"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		if len(input.ImageIds) == 0 {
+			c.JSON(400, gin.H{"error": "No image IDs provided"})
+			return
+		}
+
+		// Verify album exists and is manual
+		var albumType string
+		err = db.QueryRow("SELECT type FROM albums WHERE id = ?", albumID).Scan(&albumType)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(404, gin.H{"error": "Album not found"})
+				return
+			}
+			c.JSON(500, gin.H{"error": "Database error"})
+			return
+		}
+
+		if albumType != "manual" {
+			c.JSON(400, gin.H{"error": "Can only add images to manual albums"})
+			return
+		}
+
+		// Add images to album
+		for _, imageID := range input.ImageIds {
+			_, err = db.Exec(`
+				INSERT OR IGNORE INTO album_images (album_id, image_id) 
+				VALUES (?, ?)`,
+				albumID, imageID,
+			)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "Failed to add images to album"})
+				return
+			}
+		}
+
+		c.JSON(200, gin.H{"message": "Images added to album successfully"})
 	}
 }
