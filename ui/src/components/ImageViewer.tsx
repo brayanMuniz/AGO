@@ -7,6 +7,9 @@ interface ImageItem {
   filename: string;
   width: number;
   height: number;
+  favorite?: boolean;
+  likes?: number;
+  rating?: number;
 }
 
 interface ImageViewerProps {
@@ -26,11 +29,84 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [showUI, setShowUI] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [imageData, setImageData] = useState<{likes: number, rating: number, favorite: boolean} | null>(null);
   const hideUITimer = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastInteractionTime = useRef<number>(Date.now());
 
   const currentImage = images[currentIndex];
+
+  // Load current image data
+  useEffect(() => {
+    const loadImageData = async () => {
+      if (!currentImage) return;
+      try {
+        const response = await fetch(`/api/images/${currentImage.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setImageData({
+            likes: data.likes || 0,
+            rating: data.rating || 0,
+            favorite: data.favorite || false
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load image data:', error);
+      }
+    };
+    loadImageData();
+  }, [currentImage]);
+
+  // API helper functions
+  const updateImageRating = async (newRating: number) => {
+    if (!currentImage || !imageData) return;
+    try {
+      const response = await fetch(`/api/images/${currentImage.id}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: newRating })
+      });
+      if (response.ok) {
+        setImageData(prev => prev ? { ...prev, rating: newRating } : null);
+      }
+    } catch (error) {
+      console.error('Failed to update rating:', error);
+    }
+  };
+
+  const toggleImageFavorite = async () => {
+    if (!currentImage || !imageData) return;
+    const newFavorite = !imageData.favorite;
+    try {
+      const response = await fetch(`/api/images/${currentImage.id}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: newFavorite })
+      });
+      if (response.ok) {
+        setImageData(prev => prev ? { ...prev, favorite: newFavorite } : null);
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    }
+  };
+
+  const incrementImageLike = async () => {
+    if (!currentImage || !imageData) return;
+    const newLikes = imageData.likes + 1;
+    try {
+      const response = await fetch(`/api/images/${currentImage.id}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ like_count: newLikes })
+      });
+      if (response.ok) {
+        setImageData(prev => prev ? { ...prev, likes: newLikes } : null);
+      }
+    } catch (error) {
+      console.error('Failed to increment like:', error);
+    }
+  };
 
   // Detect if device supports touch
   useEffect(() => {
@@ -110,6 +186,25 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           event.preventDefault();
           toggleUI();
           break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+          event.preventDefault();
+          const rating = parseInt(event.key);
+          updateImageRating(rating);
+          break;
+        case 'f':
+        case 'F':
+          event.preventDefault();
+          toggleImageFavorite();
+          break;
+        case 'l':
+        case 'L':
+          event.preventDefault();
+          incrementImageLike();
+          break;
         default:
           break;
       }
@@ -118,7 +213,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onNavigate, onClose, resetUITimer, toggleUI]);
+  }, [onNavigate, onClose, resetUITimer, toggleUI, updateImageRating, toggleImageFavorite, incrementImageLike]);
 
   // Handle mouse movement (desktop)
   const handleMouseMove = useCallback(() => {
@@ -141,6 +236,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
   // Handle screen tap/click for navigation and UI toggle
   const handleScreenClick = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    // Handle middle click to open in new tab
+    if ('button' in e && e.button === 1) {
+      e.preventDefault();
+      window.open(`/image/${currentImage.id}`, '_blank');
+      return;
+    }
+
     const rect = e.currentTarget.getBoundingClientRect();
     let clientX: number;
 
@@ -167,7 +269,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     } else {
       toggleUI();
     }
-  }, [onNavigate, resetUITimer, toggleUI]);
+  }, [onNavigate, resetUITimer, toggleUI, currentImage]);
 
   // Initialize UI timer
   useEffect(() => {
@@ -190,6 +292,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       ref={containerRef}
       className="fixed inset-0 bg-black flex items-center justify-center select-none z-50"
       onClick={handleScreenClick}
+      onMouseDown={handleScreenClick}
       onMouseMove={handleMouseMove}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -360,8 +463,22 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           {/* Image Controls */}
           <SimpleImageControls
             image={currentImage}
+            externalData={imageData || undefined}
             onUpdate={() => {
               resetUITimer();
+              // Reload image data after update
+              if (currentImage) {
+                fetch(`/api/images/${currentImage.id}`)
+                  .then(res => res.json())
+                  .then(data => {
+                    setImageData({
+                      likes: data.likes || 0,
+                      rating: data.rating || 0,
+                      favorite: data.favorite || false
+                    });
+                  })
+                  .catch(console.error);
+              }
             }}
             onUITimerReset={resetUITimer}
           />

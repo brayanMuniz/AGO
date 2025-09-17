@@ -11,12 +11,18 @@ interface SimpleImageControlsProps {
   image: ImageItem;
   onUpdate?: () => void;
   onUITimerReset?: () => void;
+  externalData?: {
+    likes: number;
+    rating: number;
+    favorite: boolean;
+  };
 }
 
 const SimpleImageControls: React.FC<SimpleImageControlsProps> = ({
   image,
   onUpdate,
   onUITimerReset,
+  externalData,
 }) => {
   const [likeCount, setLikeCount] = useState(0);
   const [rating, setRating] = useState(0);
@@ -28,33 +34,41 @@ const SimpleImageControls: React.FC<SimpleImageControlsProps> = ({
     setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
   }, []);
 
-  // Load image data when image changes
+  // Load image data when image changes or use external data
   useEffect(() => {
-    const loadImageData = async () => {
-      try {
-        const response = await fetch(`/api/images/${image.id}`);
-        if (response.ok) {
-          const imageData = await response.json();
-          setLikeCount(imageData.likes || 0);
-          setRating(imageData.rating || 0);
-          setIsFavorited(imageData.favorite || false);
-        } else {
-          // Fallback to defaults if API fails
+    if (externalData) {
+      // Use external data if provided (from parent component)
+      setLikeCount(externalData.likes);
+      setRating(externalData.rating);
+      setIsFavorited(externalData.favorite);
+    } else {
+      // Load from API if no external data
+      const loadImageData = async () => {
+        try {
+          const response = await fetch(`/api/images/${image.id}`);
+          if (response.ok) {
+            const imageData = await response.json();
+            setLikeCount(imageData.likes || 0);
+            setRating(imageData.rating || 0);
+            setIsFavorited(imageData.favorite || false);
+          } else {
+            // Fallback to defaults if API fails
+            setLikeCount(0);
+            setRating(0);
+            setIsFavorited(false);
+          }
+        } catch (error) {
+          console.error('Failed to load image data:', error);
+          // Fallback to defaults on error
           setLikeCount(0);
           setRating(0);
           setIsFavorited(false);
         }
-      } catch (error) {
-        console.error('Failed to load image data:', error);
-        // Fallback to defaults on error
-        setLikeCount(0);
-        setRating(0);
-        setIsFavorited(false);
-      }
-    };
-    
-    loadImageData();
-  }, [image.id]);
+      };
+      
+      loadImageData();
+    }
+  }, [image.id, externalData]);
 
   const handleLikeIncrement = async () => {
     const previousCount = likeCount;

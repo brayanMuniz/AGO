@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
 import GalleryView from "../components/GalleryView";
+import ImageControlsBar from "../components/ImageControlsBar";
+import Pagination from "../components/Pagination";
 
 interface BackendImageItem {
   id: number;
@@ -26,6 +28,13 @@ interface Album {
   cover_image_id?: number | null;
 }
 
+interface PaginationData {
+  current_page: number;
+  total_pages: number;
+  total_count: number;
+  limit: number;
+}
+
 const AlbumDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [album, setAlbum] = useState<Album | null>(null);
@@ -46,6 +55,17 @@ const AlbumDetailPage: React.FC = () => {
   const [tagsLoading, setTagsLoading] = useState(false);
   const [includeTagSearch, setIncludeTagSearch] = useState("");
   const [excludeTagSearch, setExcludeTagSearch] = useState("");
+  const [pagination, setPagination] = useState<PaginationData>({
+    current_page: 1,
+    total_pages: 1,
+    total_count: 0,
+    limit: 20,
+  });
+  
+  // Controls state
+  const [sortBy, setSortBy] = useState("random");
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [imageSize, setImageSize] = useState<'small' | 'medium' | 'large'>('medium');
 
   useEffect(() => {
     const fetchAlbumData = async () => {
@@ -72,21 +92,8 @@ const AlbumDetailPage: React.FC = () => {
         }
         setAlbum(currentAlbum);
 
-        // Fetch album images
-        const imagesResponse = await fetch(`/api/albums/${id}/images`);
-        if (!imagesResponse.ok) {
-          throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
-        }
-        const imageData: BackendImageItem[] = await imagesResponse.json();
-        
-        const mappedImages: ImageItem[] = Array.isArray(imageData) ? imageData.map((img) => ({
-          id: img.id,
-          filename: img.filename,
-          width: img.width,
-          height: img.height,
-        })) : [];
-        
-        setImages(mappedImages);
+        // Fetch album images with pagination
+        await fetchImages(1);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -96,6 +103,13 @@ const AlbumDetailPage: React.FC = () => {
 
     fetchAlbumData();
   }, [id]);
+
+  // Refetch images when controls change
+  useEffect(() => {
+    if (id) {
+      fetchImages(1);
+    }
+  }, [sortBy, itemsPerPage]);
 
   const handleSetCover = async (imageId: number) => {
     if (!album || isUpdatingCover) return;
@@ -157,17 +171,19 @@ const AlbumDetailPage: React.FC = () => {
     }
   };
 
-  const refreshAlbumImages = async () => {
+  const fetchImages = async (page: number = 1) => {
     if (!id) return;
     
     try {
-      const imagesResponse = await fetch(`/api/albums/${id}/images`);
+      setLoading(true);
+      const url = `/api/albums/${id}/images?page=${page}&limit=${itemsPerPage}&sort=${sortBy}`;
+      const imagesResponse = await fetch(url);
       if (!imagesResponse.ok) {
         throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
       }
-      const imageData: BackendImageItem[] = await imagesResponse.json();
+      const data = await imagesResponse.json();
       
-      const mappedImages: ImageItem[] = Array.isArray(imageData) ? imageData.map((img) => ({
+      const mappedImages: ImageItem[] = Array.isArray(data.images) ? data.images.map((img: BackendImageItem) => ({
         id: img.id,
         filename: img.filename,
         width: img.width,
@@ -175,9 +191,19 @@ const AlbumDetailPage: React.FC = () => {
       })) : [];
       
       setImages(mappedImages);
+      if (data.pagination) {
+        setPagination(data.pagination);
+      }
     } catch (error) {
-      console.error("Error refreshing album images:", error);
+      console.error("Error fetching album images:", error);
+      setError(error instanceof Error ? error.message : "Failed to fetch images");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const refreshAlbumImages = async () => {
+    await fetchImages(pagination.current_page);
   };
 
   const fetchAllTags = async () => {
@@ -246,7 +272,7 @@ const AlbumDetailPage: React.FC = () => {
         }
 
         // Refresh album images after updating filters
-        await refreshAlbumImages();
+        await fetchImages(1);
       }
 
       // Update album name would require a separate endpoint
@@ -439,7 +465,7 @@ const AlbumDetailPage: React.FC = () => {
               </div>
             </div>
             <div className="text-gray-400 text-sm">
-              {images.length} image{images.length !== 1 ? 's' : ''}
+              Showing {images.length} of {pagination.total_count} images
             </div>
           </div>
           
@@ -456,9 +482,34 @@ const AlbumDetailPage: React.FC = () => {
             </div>
           )}
           
+          {/* Controls Bar */}
+          <ImageControlsBar
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
+            imageSize={imageSize}
+            onImageSizeChange={setImageSize}
+          />
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded mb-6">
+              Error: {error}
+            </div>
+          )}
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={pagination.current_page}
+            totalPages={pagination.total_pages}
+            onPageChange={fetchImages}
+          />
+          
           <div className={isSettingCover ? "cursor-pointer" : ""}>
             <GalleryView 
-              images={images} 
+              images={images}
+              imageSize={imageSize}
               onImageClick={isSettingCover ? handleSetCover : undefined}
             />
           </div>

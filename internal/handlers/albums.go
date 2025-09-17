@@ -45,6 +45,20 @@ func CreateAlbumHandler(db *sql.DB) gin.HandlerFunc {
 func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+		
+		// Parse pagination parameters
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+		sortBy := c.DefaultQuery("sort", "random")
+
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 100 {
+			limit = 20
+		}
+
+		offset := (page - 1) * limit
 
 		var albumType string
 		err := db.QueryRow("SELECT type FROM albums WHERE id = ?", id).Scan(&albumType)
@@ -54,15 +68,53 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var images []database.ImageResult
+		var totalCount int
+
+		// Build order by clause
+		var orderBy string
+		switch sortBy {
+		case "date_asc":
+			orderBy = "ORDER BY images.id ASC"
+		case "date_desc":
+			orderBy = "ORDER BY images.id DESC"
+		case "rating_desc":
+			orderBy = "ORDER BY images.rating DESC, images.id DESC"
+		case "rating_asc":
+			orderBy = "ORDER BY images.rating ASC, images.id ASC"
+		case "likes_desc":
+			orderBy = "ORDER BY images.like_count DESC, images.id DESC"
+		case "likes_asc":
+			orderBy = "ORDER BY images.like_count ASC, images.id ASC"
+		case "random":
+			orderBy = "ORDER BY RANDOM()"
+		default:
+			orderBy = "ORDER BY RANDOM()"
+		}
 
 		if albumType == "manual" {
-			rows, err := db.Query(`
+			// Get total count
+			err = db.QueryRow(`
+				SELECT COUNT(*)
+				FROM album_images
+				JOIN images ON album_images.image_id = images.id
+				WHERE album_images.album_id = ?
+			`, id).Scan(&totalCount)
+			if err != nil {
+				c.JSON(500, gin.H{"error": err.Error()})
+				return
+			}
+
+			// Get paginated results
+			query := `
 				SELECT images.id, images.phash, images.filename, images.width, images.height, images.favorite, images.like_count, images.rating
 				FROM album_images
 				JOIN images ON album_images.image_id = images.id
 				WHERE album_images.album_id = ?
-			`, id)
+				` + orderBy + `
+				LIMIT ? OFFSET ?
+			`
 
+			rows, err := db.Query(query, id, limit, offset)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return
@@ -81,14 +133,24 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 		} else if albumType == "smart" {
 			albumID, _ := strconv.Atoi(id)
-			images, err = database.GetSmartAlbumImages(db, albumID)
+			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, page, limit, sortBy)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return
 			}
 		}
 
-		c.JSON(200, images)
+		totalPages := (totalCount + limit - 1) / limit
+
+		c.JSON(200, gin.H{
+			"images": images,
+			"pagination": gin.H{
+				"current_page": page,
+				"total_pages":  totalPages,
+				"total_count":  totalCount,
+				"limit":        limit,
+			},
+		})
 	}
 }
 
