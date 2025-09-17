@@ -29,7 +29,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [showUI, setShowUI] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [imageData, setImageData] = useState<{likes: number, rating: number, favorite: boolean} | null>(null);
+  const [imageData, setImageData] = useState<{ likes: number, rating: number, favorite: boolean } | null>(null);
   const hideUITimer = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastInteractionTime = useRef<number>(Date.now());
@@ -487,7 +487,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               navigate(`/image/${currentImage.id}`);
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             className="absolute bottom-4 right-4 md:bottom-6 md:right-8 bg-black/60 rounded p-2 md:p-3 hover:bg-black/80 transition text-white touch-manipulation"
             style={{ zIndex: 60 }}
