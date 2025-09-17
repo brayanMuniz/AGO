@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
 import GalleryView from "../components/GalleryView";
+import ImageControlsBar from "../components/ImageControlsBar";
+import Pagination from "../components/Pagination";
 
 interface BackendImageItem {
   id: number;
@@ -17,6 +19,21 @@ interface ImageItem {
   filename: string;
   width: number;
   height: number;
+}
+
+interface PaginationData {
+  current_page: number;
+  total_pages: number;
+  total_count: number;
+  limit: number;
+}
+
+interface TagInfo {
+  id: number;
+  name: string;
+  category: string;
+  imageCount: number;
+  isFavorite: boolean;
 }
 
 interface EntityDetailPageProps {
@@ -44,6 +61,18 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
   const [showAlbumModal, setShowAlbumModal] = useState(false);
   const [manualAlbums, setManualAlbums] = useState<any[]>([]);
+  const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
+  const [pagination, setPagination] = useState<PaginationData>({
+    current_page: 1,
+    total_pages: 1,
+    total_count: 0,
+    limit: 20,
+  });
+  
+  // Controls state
+  const [sortBy, setSortBy] = useState("random");
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [imageSize, setImageSize] = useState<'small' | 'medium' | 'large'>('medium');
 
   const handleImageSelect = (imageId: number) => {
     if (!isSelectingImages) return;
@@ -92,38 +121,56 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
     }
   };
 
+  const fetchImages = async (page: number = 1) => {
+    if (!entityName) {
+      setError(`No ${entityTypeSingular.toLowerCase()} provided`);
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const url = `/api/images/by-tags?tags=${encodeURIComponent(entityName)}&page=${page}&limit=${itemsPerPage}&sort=${sortBy}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const mapped: ImageItem[] = (data.images || []).map((img: BackendImageItem) => ({
+        id: img.id,
+        filename: img.filename,
+        width: img.width,
+        height: img.height,
+      }));
+      setImages(mapped);
+      setPagination(data.pagination);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+      setImages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTagInfo = async () => {
+    if (!entityName) return;
+    try {
+      const res = await fetch(`/api/categories/tag/${encodeURIComponent(entityName)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTagInfo(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch tag info:', e);
+    }
+  };
+
   useEffect(() => {
-    const run = async () => {
-      if (!entityName) {
-        setError(`No ${entityTypeSingular.toLowerCase()} provided`);
-        setLoading(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        setError(null);
-        const url = `/api/images/by-tags?tags=${encodeURIComponent(entityName)}`;
-        const res = await fetch(url);
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => null);
-          throw new Error(errJson?.error || `HTTP ${res.status}`);
-        }
-        const json: BackendImageItem[] = await res.json();
-        const mapped: ImageItem[] = json.map((img) => ({
-          id: img.id,
-          filename: img.filename,
-          width: img.width,
-          height: img.height,
-        }));
-        setImages(mapped);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Unknown error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
-  }, [entityName, entityTypeSingular]);
+    fetchImages(1);
+    fetchTagInfo();
+  }, [entityName, entityTypeSingular, sortBy, itemsPerPage]);
 
   if (loading) {
     return (
@@ -163,7 +210,29 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
         <MobileNav />
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold text-gray-100">{icon} {entityName}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-100">{icon} {entityName}</h1>
+              {tagInfo && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const method = tagInfo.isFavorite ? "DELETE" : "POST";
+                      const categoryEndpoint = tagInfo.category === "general" ? "tag" : tagInfo.category;
+                      await fetch(`/api/user/favorite/${categoryEndpoint}/${tagInfo.id}`, { method });
+                      setTagInfo({ ...tagInfo, isFavorite: !tagInfo.isFavorite });
+                    } catch (e) {
+                      console.error('Failed to toggle favorite:', e);
+                    }
+                  }}
+                  className={`text-2xl transition-colors hover:scale-110 transform ${
+                    tagInfo.isFavorite ? 'text-red-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'
+                  }`}
+                  title={tagInfo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  {tagInfo.isFavorite ? '❤️' : '🤍'}
+                </button>
+              )}
+            </div>
             <button
               onClick={() => {
                 if (isSelectingImages) {
@@ -208,8 +277,38 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
             </div>
           )}
           
+          {/* Controls Bar */}
+          <ImageControlsBar
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
+            imageSize={imageSize}
+            onImageSizeChange={setImageSize}
+          />
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded mb-6">
+              Error: {error}
+            </div>
+          )}
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={pagination.current_page}
+            totalPages={pagination.total_pages}
+            onPageChange={fetchImages}
+          />
+
+          {/* Results Info */}
+          <div className="text-center text-gray-400 text-sm mt-4 mb-2">
+            Showing {images.length} of {pagination.total_count} images
+          </div>
+          
           <GalleryView 
             images={images} 
+            imageSize={imageSize}
             isSelecting={isSelectingImages}
             selectedImages={selectedImages}
             onImageSelect={handleImageSelect}

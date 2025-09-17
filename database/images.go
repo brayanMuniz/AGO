@@ -170,6 +170,122 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	return results, nil
 }
 
+func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string) ([]ImageResult, int, error) {
+	if len(tags) == 0 {
+		return nil, 0, fmt.Errorf("no tags provided")
+	}
+
+	offset := (page - 1) * limit
+
+	// Build order by clause
+	var orderBy string
+	switch sortBy {
+	case "date_asc":
+		orderBy = "ORDER BY images.id ASC"
+	case "date_desc":
+		orderBy = "ORDER BY images.id DESC"
+	case "rating_desc":
+		orderBy = "ORDER BY images.rating DESC, images.id DESC"
+	case "rating_asc":
+		orderBy = "ORDER BY images.rating ASC, images.id ASC"
+	case "likes_desc":
+		orderBy = "ORDER BY images.like_count DESC, images.id DESC"
+	case "likes_asc":
+		orderBy = "ORDER BY images.like_count ASC, images.id ASC"
+	case "random":
+		orderBy = "ORDER BY RANDOM()"
+	default:
+		orderBy = "ORDER BY RANDOM()"
+	}
+
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(tags)), ",")
+	
+	// Get total count first
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(DISTINCT images.id)
+		FROM images
+		JOIN image_tags ON images.id = image_tags.image_id
+		JOIN tags ON tags.id = image_tags.tag_id
+		WHERE tags.name IN (%s)
+		GROUP BY images.id
+		HAVING COUNT(DISTINCT tags.name) = ?
+	`, placeholders)
+
+	args := make([]any, len(tags)+1)
+	for i, tag := range tags {
+		args[i] = tag
+	}
+	args[len(tags)] = len(tags)
+
+	// Count total matching images
+	var totalCount int
+	countRows, err := db.Query(countQuery, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer countRows.Close()
+	
+	for countRows.Next() {
+		totalCount++
+	}
+
+	// Get paginated results
+	query := fmt.Sprintf(`
+		SELECT 
+			images.id,
+			images.phash,
+			images.filename,
+			images.width,
+			images.height,
+			images.favorite,
+			images.like_count,
+			images.rating
+		FROM images
+		JOIN image_tags ON images.id = image_tags.image_id
+		JOIN tags ON tags.id = image_tags.tag_id
+		WHERE tags.name IN (%s)
+		GROUP BY images.id
+		HAVING COUNT(DISTINCT tags.name) = ?
+		%s
+		LIMIT ? OFFSET ?
+	`, placeholders, orderBy)
+
+	paginatedArgs := make([]any, len(tags)+3)
+	for i, tag := range tags {
+		paginatedArgs[i] = tag
+	}
+	paginatedArgs[len(tags)] = len(tags)
+	paginatedArgs[len(tags)+1] = limit
+	paginatedArgs[len(tags)+2] = offset
+
+	rows, err := db.Query(query, paginatedArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var results []ImageResult
+	for rows.Next() {
+		var img ImageResult
+		err := rows.Scan(
+			&img.ID,
+			&img.Phash,
+			&img.Filename,
+			&img.Width,
+			&img.Height,
+			&img.Favorite,
+			&img.Likes,
+			&img.Rating,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		results = append(results, img)
+	}
+
+	return results, totalCount, nil
+}
+
 func GetImageByID(db *sql.DB, id int) (*ImageResult, error) {
 	query := `
 		SELECT id, phash, filename, width, height, favorite, rating, like_count

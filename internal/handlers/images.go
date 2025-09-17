@@ -20,16 +20,16 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 		sortBy := c.DefaultQuery("sort", "random")
-		
+
 		if page < 1 {
 			page = 1
 		}
 		if limit < 1 || limit > 100 {
 			limit = 20
 		}
-		
+
 		offset := (page - 1) * limit
-		
+
 		// Build query based on sort parameter
 		var orderBy string
 		switch sortBy {
@@ -50,7 +50,7 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		default:
 			orderBy = "ORDER BY RANDOM()"
 		}
-		
+
 		// Get total count
 		var totalCount int
 		countQuery := "SELECT COUNT(*) FROM images"
@@ -59,7 +59,7 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count images"})
 			return
 		}
-		
+
 		// Get images with pagination
 		query := fmt.Sprintf(`
 			SELECT id, phash, filename, width, height, favorite, like_count, rating
@@ -67,14 +67,14 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 			%s
 			LIMIT ? OFFSET ?
 		`, orderBy)
-		
+
 		rows, err := db.Query(query, limit, offset)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch images"})
 			return
 		}
 		defer rows.Close()
-		
+
 		var images []database.ImageResult
 		for rows.Next() {
 			var img database.ImageResult
@@ -85,9 +85,9 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			images = append(images, img)
 		}
-		
+
 		totalPages := (totalCount + limit - 1) / limit
-		
+
 		c.JSON(http.StatusOK, gin.H{
 			"images": images,
 			"pagination": gin.H{
@@ -131,16 +131,42 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 			ctx.JSON(400, gin.H{"error": "Missing tags parameter"})
 			return
 		}
+		
+		// Parse pagination parameters
+		page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "20"))
+		sortBy := ctx.DefaultQuery("sort", "random")
+
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 100 {
+			limit = 20
+		}
+
 		tagList := strings.Split(tagsParam, ",")
 		for i := range tagList {
 			tagList[i] = strings.TrimSpace(tagList[i])
 		}
-		results, err := database.GetImagesByTags(db, tagList)
+		
+		// Get paginated results
+		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		ctx.JSON(200, results)
+		
+		totalPages := (totalCount + limit - 1) / limit
+
+		ctx.JSON(200, gin.H{
+			"images": results,
+			"pagination": gin.H{
+				"current_page": page,
+				"total_pages":  totalPages,
+				"total_count":  totalCount,
+				"limit":        limit,
+			},
+		})
 	}
 }
 

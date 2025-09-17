@@ -93,3 +93,25 @@ func RemoveTagFromImage(db *sql.DB, imageID int, tagName string) error {
 
 	return nil
 }
+
+func GetTagByName(db *sql.DB, tagName string) (*Tag, error) {
+	var tag Tag
+	err := db.QueryRow(`
+		SELECT t.id, t.name, t.category,
+		       COUNT(it.image_id) as image_count,
+		       COALESCE(t.favorite, false) as is_favorite
+		FROM tags t
+		LEFT JOIN image_tags it ON t.id = it.tag_id
+		WHERE t.name = ?
+		GROUP BY t.id, t.name, t.category, t.favorite
+	`, tagName).Scan(&tag.ID, &tag.Name, &tag.Category, &tag.ImageCount, &tag.IsFavorite)
+	
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Tag not found
+		}
+		return nil, err
+	}
+	
+	return &tag, nil
+}

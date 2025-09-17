@@ -16,6 +16,9 @@ func RegisterCategoriesRoute(r *gin.RouterGroup, db *sql.DB) {
 	categoryGroup.GET("/characters", categoryHandler(db, "character"))
 	categoryGroup.GET("/artists", categoryHandler(db, "artist"))
 	categoryGroup.GET("/ratings", ratingsHandler())
+	
+	// Get tag info by name
+	categoryGroup.GET("/tag/:name", getTagByNameHandler(db))
 
 }
 
@@ -39,5 +42,28 @@ func ratingsHandler() gin.HandlerFunc {
 			{"id": 4, "name": "explicit", "category": "rating"},
 		}
 		ctx.JSON(200, gin.H{"tags": ratings})
+	}
+}
+
+func getTagByNameHandler(db *sql.DB) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		tagName := ctx.Param("name")
+		if tagName == "" {
+			ctx.JSON(400, gin.H{"error": "Tag name is required"})
+			return
+		}
+		
+		tag, err := database.GetTagByName(db, tagName)
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to fetch tag"})
+			return
+		}
+		
+		if tag == nil {
+			ctx.JSON(404, gin.H{"error": "Tag not found"})
+			return
+		}
+		
+		ctx.JSON(200, tag)
 	}
 }
