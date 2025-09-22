@@ -19,6 +19,9 @@ func RegisterCategoriesRoute(r *gin.RouterGroup, db *sql.DB) {
 	
 	// Get tag info by name
 	categoryGroup.GET("/tag/:name", getTagByNameHandler(db))
+	
+	// Get explicitness info by name (for ratings)
+	categoryGroup.GET("/explicitness/:name", getExplicitnessHandler(db))
 
 }
 
@@ -62,6 +65,56 @@ func getTagByNameHandler(db *sql.DB) gin.HandlerFunc {
 		if tag == nil {
 			ctx.JSON(404, gin.H{"error": "Tag not found"})
 			return
+		}
+		
+		ctx.JSON(200, tag)
+	}
+}
+
+func getExplicitnessHandler(db *sql.DB) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		explicitnessName := ctx.Param("name")
+		if explicitnessName == "" {
+			ctx.JSON(400, gin.H{"error": "Explicitness name is required"})
+			return
+		}
+		
+		// Map URL names to actual tag names
+		tagNameMap := map[string]string{
+			"general":      "rating_general",
+			"sensitive":    "rating_sensitive", 
+			"questionable": "rating_questionable",
+			"explicit":     "rating_explicit",
+		}
+		
+		tagName, exists := tagNameMap[explicitnessName]
+		if !exists {
+			ctx.JSON(404, gin.H{"error": "Explicitness level not found"})
+			return
+		}
+		
+		// Try to get the tag from database first
+		tag, err := database.GetTagByName(db, tagName)
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to fetch explicitness info"})
+			return
+		}
+		
+		// If tag doesn't exist in database, create it
+		if tag == nil {
+			// Insert the rating tag into the database
+			_, err = db.Exec("INSERT OR IGNORE INTO tags (name, category, favorite) VALUES (?, ?, ?)", tagName, "rating", false)
+			if err != nil {
+				ctx.JSON(500, gin.H{"error": "Failed to create rating tag"})
+				return
+			}
+			
+			// Try to get it again
+			tag, err = database.GetTagByName(db, tagName)
+			if err != nil || tag == nil {
+				ctx.JSON(500, gin.H{"error": "Failed to retrieve rating tag"})
+				return
+			}
 		}
 		
 		ctx.JSON(200, tag)

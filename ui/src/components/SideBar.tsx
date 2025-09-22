@@ -38,6 +38,7 @@ const Sidebar: React.FC = () => {
         <Link to="/artists" className="hover:text-indigo-400 transition py-1">Artists</Link>
         <Link to="/characters" className="hover:text-indigo-400 transition py-1">Characters</Link>
         <Link to="/series" className="hover:text-indigo-400 transition py-1">Series</Link>
+        <Link to="/explicitness" className="hover:text-indigo-400 transition py-1">Explicitness</Link>
 
         <div className="mt-2">
           <Link to="/albums" className="text-white hover:text-indigo-400 transition block mb-2">

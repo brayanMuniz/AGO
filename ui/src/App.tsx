@@ -12,6 +12,8 @@ import AllCharactersPage from "./pages/AllCharactersPage";
 import CharacterPage from "./pages/CharacterPage";
 import AllSeriesPage from "./pages/AllSeriesPage";
 import SeriesPage from "./pages/SeriesPage";
+import AllExplicitnessPage from "./pages/AllExplicitnessPage";
+import ExplicitnessPage from "./pages/ExplicitnessPage";
 
 import { Routes, Route } from "react-router-dom";
 
@@ -37,6 +39,9 @@ function App() {
 
         <Route path="/series" element={<AllSeriesPage />} />
         <Route path="/series/:series" element={<SeriesPage />} />
+
+        <Route path="/explicitness" element={<AllExplicitnessPage />} />
+        <Route path="/explicitness/:explicitness" element={<ExplicitnessPage />} />
 
       </Routes>
     </div>
