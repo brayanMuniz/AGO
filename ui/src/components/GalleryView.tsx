@@ -52,6 +52,20 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
     }
   };
 
+  const handleImageMouseDown = (e: React.MouseEvent, imageId: number, index: number) => {
+    // Handle middle click to open in new tab
+    if (e.button === 1) {
+      e.preventDefault();
+      window.open(`/image/${imageId}`, '_blank');
+      return;
+    }
+    
+    // Handle left click normally
+    if (e.button === 0) {
+      handleImageClick(imageId, index);
+    }
+  };
+
   const handleCloseViewer = () => {
     setIsViewerOpen(false);
     setSelectedImageIndex(null);
@@ -88,6 +102,12 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
               <div
                 key={img.id}
                 onClick={() => onImageSelect?.(img.id)}
+                onMouseDown={(e) => {
+                  if (e.button === 1) {
+                    e.preventDefault();
+                    window.open(`/image/${img.id}`, '_blank');
+                  }
+                }}
                 className={`break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md hover:shadow-lg transition-all cursor-pointer relative ${isSelected ? 'ring-4 ring-blue-500' : 'hover:ring-2 hover:ring-pink-500'
                   }`}
               >
@@ -112,6 +132,7 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
             <div
               key={img.id}
               onClick={() => onImageClick(img.id)}
+              onMouseDown={(e) => handleImageMouseDown(e, img.id, index)}
               className="break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer hover:ring-2 hover:ring-pink-500"
             >
               <img
@@ -126,6 +147,7 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
             <div
               key={img.id}
               onClick={() => handleImageClick(img.id, index)}
+              onMouseDown={(e) => handleImageMouseDown(e, img.id, index)}
               className="break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer hover:ring-2 hover:ring-pink-500"
             >
               <img

@@ -493,10 +493,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
             onMouseDown={(e) => {
               e.stopPropagation();
               e.preventDefault();
+              
+              // Handle middle click to open in new tab
+              if (e.button === 1) {
+                window.open(`/image/${currentImage.id}`, '_blank');
+                return;
+              }
             }}
             className="absolute bottom-4 right-4 md:bottom-6 md:right-8 bg-black/60 rounded p-2 md:p-3 hover:bg-black/80 transition text-white touch-manipulation"
             style={{ zIndex: 60 }}
-            aria-label="Go to image page"
+            aria-label="Go to image page (middle-click to open in new tab)"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
