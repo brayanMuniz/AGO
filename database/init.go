@@ -67,6 +67,8 @@ func createStartingTables(db *sql.DB) error {
 	    exclude_tag_ids TEXT,   
 	    min_rating INTEGER,    
 	    favorite_only BOOLEAN,
+	    include_album_ids TEXT,
+	    exclude_album_ids TEXT,
 	    FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE
 	);
 

@@ -7,18 +7,23 @@ import (
 )
 
 func GetSmartAlbumImages(db *sql.DB, albumID int) ([]ImageResult, error) {
-	var includeTagCSV, excludeTagCSV string
+	var includeTagCSV, excludeTagCSV, includeAlbumCSV, excludeAlbumCSV string
 	var minRating int
 	var favoriteOnly bool
 
-	query := `SELECT include_tag_ids, exclude_tag_ids, min_rating, favorite_only FROM smart_album_filters WHERE album_id = ?`
-	err := db.QueryRow(query, albumID).Scan(&includeTagCSV, &excludeTagCSV, &minRating, &favoriteOnly)
+	query := `SELECT include_tag_ids, exclude_tag_ids, min_rating, favorite_only, 
+	                 COALESCE(include_album_ids, '') as include_album_ids,
+	                 COALESCE(exclude_album_ids, '') as exclude_album_ids
+	          FROM smart_album_filters WHERE album_id = ?`
+	err := db.QueryRow(query, albumID).Scan(&includeTagCSV, &excludeTagCSV, &minRating, &favoriteOnly, &includeAlbumCSV, &excludeAlbumCSV)
 	if err != nil {
 		return nil, err
 	}
 
 	includeIDs := parseCSV(includeTagCSV)
 	excludeIDs := parseCSV(excludeTagCSV)
+	includeAlbumIDs := parseCSV(includeAlbumCSV)
+	excludeAlbumIDs := parseCSV(excludeAlbumCSV)
 
 	base := `
 	SELECT DISTINCT images.id, images.phash, images.filename, images.width, images.height, images.favorite, images.like_count, images.rating
@@ -59,6 +64,55 @@ func GetSmartAlbumImages(db *sql.DB, albumID int) ([]ImageResult, error) {
 		conditions = append(conditions, "images.favorite = 1")
 	}
 
+	// Handle album inclusion/exclusion with proper precedence
+	// Include albums: images must be in at least one of these albums
+	if len(includeAlbumIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(includeAlbumIDs))
+		placeholders = strings.TrimRight(placeholders, ",")
+		conditions = append(conditions, fmt.Sprintf(`images.id IN (
+			SELECT image_id FROM album_images WHERE album_id IN (%s)
+		)`, placeholders))
+		for _, id := range includeAlbumIDs {
+			args = append(args, id)
+		}
+	}
+
+	// Exclude albums: images must NOT be in any of these albums
+	// BUT if an image is in both include and exclude albums, include takes precedence
+	if len(excludeAlbumIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(excludeAlbumIDs))
+		placeholders = strings.TrimRight(placeholders, ",")
+		
+		if len(includeAlbumIDs) > 0 {
+			// If we have include albums, only exclude if the image is NOT in any include album
+			includePlaceholders := strings.Repeat("?,", len(includeAlbumIDs))
+			includePlaceholders = strings.TrimRight(includePlaceholders, ",")
+			conditions = append(conditions, fmt.Sprintf(`(
+				images.id NOT IN (
+					SELECT image_id FROM album_images WHERE album_id IN (%s)
+				) OR images.id IN (
+					SELECT image_id FROM album_images WHERE album_id IN (%s)
+				)
+			)`, placeholders, includePlaceholders))
+			// Add exclude album IDs to args
+			for _, id := range excludeAlbumIDs {
+				args = append(args, id)
+			}
+			// Add include album IDs to args again for the OR condition
+			for _, id := range includeAlbumIDs {
+				args = append(args, id)
+			}
+		} else {
+			// No include albums, just exclude
+			conditions = append(conditions, fmt.Sprintf(`images.id NOT IN (
+				SELECT image_id FROM album_images WHERE album_id IN (%s)
+			)`, placeholders))
+			for _, id := range excludeAlbumIDs {
+				args = append(args, id)
+			}
+		}
+	}
+
 	finalQuery := base
 	if len(conditions) > 0 {
 		finalQuery += " AND " + strings.Join(conditions, " AND ")
@@ -84,18 +138,23 @@ func GetSmartAlbumImages(db *sql.DB, albumID int) ([]ImageResult, error) {
 }
 
 func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sortBy string) ([]ImageResult, int, error) {
-	var includeTagCSV, excludeTagCSV string
+	var includeTagCSV, excludeTagCSV, includeAlbumCSV, excludeAlbumCSV string
 	var minRating int
 	var favoriteOnly bool
 
-	query := `SELECT include_tag_ids, exclude_tag_ids, min_rating, favorite_only FROM smart_album_filters WHERE album_id = ?`
-	err := db.QueryRow(query, albumID).Scan(&includeTagCSV, &excludeTagCSV, &minRating, &favoriteOnly)
+	query := `SELECT include_tag_ids, exclude_tag_ids, min_rating, favorite_only,
+	                 COALESCE(include_album_ids, '') as include_album_ids,
+	                 COALESCE(exclude_album_ids, '') as exclude_album_ids
+	          FROM smart_album_filters WHERE album_id = ?`
+	err := db.QueryRow(query, albumID).Scan(&includeTagCSV, &excludeTagCSV, &minRating, &favoriteOnly, &includeAlbumCSV, &excludeAlbumCSV)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	includeIDs := parseCSV(includeTagCSV)
 	excludeIDs := parseCSV(excludeTagCSV)
+	includeAlbumIDs := parseCSV(includeAlbumCSV)
+	excludeAlbumIDs := parseCSV(excludeAlbumCSV)
 
 	// Build order by clause
 	var orderBy string
@@ -155,6 +214,55 @@ func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sort
 
 	if favoriteOnly {
 		conditions = append(conditions, "images.favorite = 1")
+	}
+
+	// Handle album inclusion/exclusion with proper precedence (same logic as non-paginated)
+	// Include albums: images must be in at least one of these albums
+	if len(includeAlbumIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(includeAlbumIDs))
+		placeholders = strings.TrimRight(placeholders, ",")
+		conditions = append(conditions, fmt.Sprintf(`images.id IN (
+			SELECT image_id FROM album_images WHERE album_id IN (%s)
+		)`, placeholders))
+		for _, id := range includeAlbumIDs {
+			args = append(args, id)
+		}
+	}
+
+	// Exclude albums: images must NOT be in any of these albums
+	// BUT if an image is in both include and exclude albums, include takes precedence
+	if len(excludeAlbumIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(excludeAlbumIDs))
+		placeholders = strings.TrimRight(placeholders, ",")
+		
+		if len(includeAlbumIDs) > 0 {
+			// If we have include albums, only exclude if the image is NOT in any include album
+			includePlaceholders := strings.Repeat("?,", len(includeAlbumIDs))
+			includePlaceholders = strings.TrimRight(includePlaceholders, ",")
+			conditions = append(conditions, fmt.Sprintf(`(
+				images.id NOT IN (
+					SELECT image_id FROM album_images WHERE album_id IN (%s)
+				) OR images.id IN (
+					SELECT image_id FROM album_images WHERE album_id IN (%s)
+				)
+			)`, placeholders, includePlaceholders))
+			// Add exclude album IDs to args
+			for _, id := range excludeAlbumIDs {
+				args = append(args, id)
+			}
+			// Add include album IDs to args again for the OR condition
+			for _, id := range includeAlbumIDs {
+				args = append(args, id)
+			}
+		} else {
+			// No include albums, just exclude
+			conditions = append(conditions, fmt.Sprintf(`images.id NOT IN (
+				SELECT image_id FROM album_images WHERE album_id IN (%s)
+			)`, placeholders))
+			for _, id := range excludeAlbumIDs {
+				args = append(args, id)
+			}
+		}
 	}
 
 	whereClause := ""

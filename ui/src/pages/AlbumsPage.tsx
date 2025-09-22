@@ -33,11 +33,15 @@ const AlbumsPage: React.FC = () => {
     excludeTags: [] as number[],
     minRating: 0,
     favoriteOnly: false,
+    includeAlbums: [] as number[],
+    excludeAlbums: [] as number[],
   });
 
-  // Search states for tag filtering
+  // Search states for tag and album filtering
   const [includeTagSearch, setIncludeTagSearch] = useState("");
   const [excludeTagSearch, setExcludeTagSearch] = useState("");
+  const [includeAlbumSearch, setIncludeAlbumSearch] = useState("");
+  const [excludeAlbumSearch, setExcludeAlbumSearch] = useState("");
 
   useEffect(() => {
     fetchAlbums();
@@ -154,6 +158,8 @@ const AlbumsPage: React.FC = () => {
             exclude_tag_ids: formData.excludeTags.join(","),
             min_rating: formData.minRating,
             favorite_only: formData.favoriteOnly,
+            include_album_ids: formData.includeAlbums.join(","),
+            exclude_album_ids: formData.excludeAlbums.join(","),
           }),
         });
 
@@ -169,6 +175,8 @@ const AlbumsPage: React.FC = () => {
         excludeTags: [],
         minRating: 0,
         favoriteOnly: false,
+        includeAlbums: [],
+        excludeAlbums: [],
       });
       setIncludeTagSearch("");
       setExcludeTagSearch("");
@@ -188,6 +196,15 @@ const AlbumsPage: React.FC = () => {
     }));
   };
 
+  const handleAlbumToggle = (albumId: number, field: "includeAlbums" | "excludeAlbums") => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: prev[field].includes(albumId)
+        ? prev[field].filter(id => id !== albumId)
+        : [...prev[field], albumId]
+    }));
+  };
+
   const handleRatingClick = (starIndex: number) => {
     const newRating = starIndex + 1;
     const finalRating = formData.minRating === newRating ? 0 : newRating;
@@ -196,6 +213,22 @@ const AlbumsPage: React.FC = () => {
 
   const getSelectedTags = (tagIds: number[]) => {
     return allTags.filter(tag => tagIds.includes(tag.id));
+  };
+
+  const getSelectedAlbums = (albumIds: number[]) => {
+    return albums.filter(album => albumIds.includes(album.id));
+  };
+
+  const getFilteredAlbums = (searchTerm: string, excludeCurrentAlbum: boolean = true) => {
+    let filteredAlbums = albums;
+    
+    // Filter out smart albums (can't include/exclude smart albums in other smart albums)
+    filteredAlbums = filteredAlbums.filter(album => album.type === 'manual');
+    
+    if (!searchTerm) return filteredAlbums;
+    return filteredAlbums.filter(album =>
+      album.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
   };
 
   const getFilteredTags = (searchTerm: string) => {
@@ -377,6 +410,96 @@ const AlbumsPage: React.FC = () => {
                         </>
                       )}
                     </div>
+
+                    {/* Album Selection Sections */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Include Albums (Optional)</label>
+                      <p className="text-xs text-gray-400 mb-2">Images must be in at least one of these albums</p>
+                      <input
+                        type="text"
+                        placeholder="Search albums to include..."
+                        value={includeAlbumSearch}
+                        onChange={(e) => setIncludeAlbumSearch(e.target.value)}
+                        className="w-full px-3 py-2 mb-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                      <div className="max-h-40 overflow-y-auto bg-gray-700 rounded-lg p-3 space-y-1">
+                        {getFilteredAlbums(includeAlbumSearch).map(album => (
+                          <label key={album.id} className="flex items-center text-sm">
+                            <input
+                              type="checkbox"
+                              checked={formData.includeAlbums.includes(album.id)}
+                              onChange={() => handleAlbumToggle(album.id, "includeAlbums")}
+                              className="mr-2 w-4 h-4 text-green-600 bg-gray-600 border-gray-500 rounded focus:ring-green-500"
+                            />
+                            <span className="text-xs text-gray-400 mr-2">📁</span>
+                            {album.name}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Exclude Albums (Optional)</label>
+                      <p className="text-xs text-gray-400 mb-2">Images must NOT be in any of these albums (unless also in include albums)</p>
+                      <input
+                        type="text"
+                        placeholder="Search albums to exclude..."
+                        value={excludeAlbumSearch}
+                        onChange={(e) => setExcludeAlbumSearch(e.target.value)}
+                        className="w-full px-3 py-2 mb-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                      <div className="max-h-40 overflow-y-auto bg-gray-700 rounded-lg p-3 space-y-1">
+                        {getFilteredAlbums(excludeAlbumSearch).map(album => (
+                          <label key={album.id} className="flex items-center text-sm">
+                            <input
+                              type="checkbox"
+                              checked={formData.excludeAlbums.includes(album.id)}
+                              onChange={() => handleAlbumToggle(album.id, "excludeAlbums")}
+                              className="mr-2 w-4 h-4 text-red-600 bg-gray-600 border-gray-500 rounded focus:ring-red-500"
+                            />
+                            <span className="text-xs text-gray-400 mr-2">📁</span>
+                            {album.name}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Selected Albums Pills */}
+                    {(formData.includeAlbums.length > 0 || formData.excludeAlbums.length > 0) && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium mb-2">Selected Albums</label>
+                        <div className="flex flex-wrap gap-2">
+                          {getSelectedAlbums(formData.includeAlbums).map(album => (
+                            <span
+                              key={`include-album-${album.id}`}
+                              className="inline-flex items-center px-2 py-1 rounded text-xs bg-green-600 text-white"
+                            >
+                              📁 {album.name}
+                              <button
+                                onClick={() => handleAlbumToggle(album.id, "includeAlbums")}
+                                className="ml-1 text-white hover:text-gray-200"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                          {getSelectedAlbums(formData.excludeAlbums).map(album => (
+                            <span
+                              key={`exclude-album-${album.id}`}
+                              className="inline-flex items-center px-2 py-1 rounded text-xs bg-red-600 text-white"
+                            >
+                              📁 {album.name}
+                              <button
+                                onClick={() => handleAlbumToggle(album.id, "excludeAlbums")}
+                                className="ml-1 text-white hover:text-gray-200"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

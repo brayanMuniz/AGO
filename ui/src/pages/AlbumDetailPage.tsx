@@ -50,11 +50,16 @@ const AlbumDetailPage: React.FC = () => {
     excludeTags: [] as number[],
     minRating: 0,
     favoriteOnly: false,
+    includeAlbums: [] as number[],
+    excludeAlbums: [] as number[],
   });
   const [allTags, setAllTags] = useState<any[]>([]);
+  const [allAlbums, setAllAlbums] = useState<Album[]>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [includeTagSearch, setIncludeTagSearch] = useState("");
   const [excludeTagSearch, setExcludeTagSearch] = useState("");
+  const [includeAlbumSearch, setIncludeAlbumSearch] = useState("");
+  const [excludeAlbumSearch, setExcludeAlbumSearch] = useState("");
   const [pagination, setPagination] = useState<PaginationData>({
     current_page: 1,
     total_pages: 1,
@@ -247,6 +252,25 @@ const AlbumDetailPage: React.FC = () => {
     }
   };
 
+  const fetchAllAlbums = async () => {
+    if (allAlbums.length > 0) return;
+    
+    try {
+      const response = await fetch("/api/albums");
+      if (!response.ok) throw new Error("Failed to fetch albums");
+      const albums = await response.json();
+      
+      // Filter out smart albums and the current album to prevent circular dependencies
+      const filteredAlbums = albums.filter((a: Album) => 
+        a.type === 'manual' && a.id !== album?.id
+      );
+      
+      setAllAlbums(filteredAlbums);
+    } catch (error) {
+      console.error("Failed to load albums:", error);
+    }
+  };
+
   const handleUpdateAlbum = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!album) return;
@@ -280,6 +304,8 @@ const AlbumDetailPage: React.FC = () => {
             exclude_tag_ids: editFormData.excludeTags.join(","),
             min_rating: editFormData.minRating,
             favorite_only: editFormData.favoriteOnly,
+            include_album_ids: editFormData.includeAlbums.join(","),
+            exclude_album_ids: editFormData.excludeAlbums.join(","),
             cover_image_id: album.cover_image_id,
           }),
         });
@@ -316,14 +342,34 @@ const AlbumDetailPage: React.FC = () => {
     setEditFormData(prev => ({ ...prev, minRating: finalRating }));
   };
 
+  const handleAlbumToggle = (albumId: number, field: "includeAlbums" | "excludeAlbums") => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: prev[field].includes(albumId)
+        ? prev[field].filter(id => id !== albumId)
+        : [...prev[field], albumId]
+    }));
+  };
+
   const getSelectedTags = (tagIds: number[]) => {
     return allTags.filter(tag => tagIds.includes(tag.id));
+  };
+
+  const getSelectedAlbums = (albumIds: number[]) => {
+    return allAlbums.filter(album => albumIds.includes(album.id));
   };
 
   const getFilteredTags = (searchTerm: string) => {
     if (!searchTerm) return allTags;
     return allTags.filter(tag => 
       tag.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  const getFilteredAlbums = (searchTerm: string) => {
+    if (!searchTerm) return allAlbums;
+    return allAlbums.filter(album =>
+      album.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
 
@@ -335,31 +381,35 @@ const AlbumDetailPage: React.FC = () => {
         excludeTags: [] as number[],
         minRating: 0,
         favoriteOnly: false,
+        includeAlbums: [] as number[],
+        excludeAlbums: [] as number[],
       };
 
       // For smart albums, fetch existing filters
       if (album.type === "smart") {
         try {
-          // Load tags first
-          await fetchAllTags();
+          // Load tags and albums first
+          await Promise.all([fetchAllTags(), fetchAllAlbums()]);
           
           // Fetch current filters
           const filtersResponse = await fetch(`/api/albums/${album.id}/filters`);
           if (filtersResponse.ok) {
             const filters = await filtersResponse.json();
             
-            // Parse comma-separated tag IDs
-            const parseTagIds = (tagString: string): number[] => {
-              if (!tagString || tagString.trim() === "") return [];
-              return tagString.split(",").map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            // Parse comma-separated IDs
+            const parseIds = (idString: string): number[] => {
+              if (!idString || idString.trim() === "") return [];
+              return idString.split(",").map(id => parseInt(id.trim())).filter(id => !isNaN(id));
             };
             
             formData = {
               ...formData,
-              includeTags: parseTagIds(filters.include_tag_ids),
-              excludeTags: parseTagIds(filters.exclude_tag_ids),
+              includeTags: parseIds(filters.include_tag_ids),
+              excludeTags: parseIds(filters.exclude_tag_ids),
               minRating: filters.min_rating || 0,
               favoriteOnly: filters.favorite_only || false,
+              includeAlbums: parseIds(filters.include_album_ids || ""),
+              excludeAlbums: parseIds(filters.exclude_album_ids || ""),
             };
           }
         } catch (error) {
@@ -664,6 +714,98 @@ const AlbumDetailPage: React.FC = () => {
                           </>
                         )}
                       </div>
+
+                      {/* Album Selection Sections */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">Include Albums (Optional)</label>
+                        <p className="text-xs text-gray-400 mb-2">Images must be in at least one of these albums</p>
+                        <input
+                          type="text"
+                          placeholder="Search albums to include..."
+                          value={includeAlbumSearch}
+                          onChange={(e) => setIncludeAlbumSearch(e.target.value)}
+                          className="w-full px-3 py-2 mb-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        <div className="max-h-40 overflow-y-auto bg-gray-700 rounded-lg p-3 space-y-1">
+                          {getFilteredAlbums(includeAlbumSearch).map(album => (
+                            <label key={album.id} className="flex items-center text-sm">
+                              <input
+                                type="checkbox"
+                                checked={editFormData.includeAlbums.includes(album.id)}
+                                onChange={() => handleAlbumToggle(album.id, "includeAlbums")}
+                                className="mr-2 w-4 h-4 text-green-600 bg-gray-600 border-gray-500 rounded focus:ring-green-500"
+                              />
+                              <span className="text-xs text-gray-400 mr-2">📁</span>
+                              {album.name}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">Exclude Albums (Optional)</label>
+                        <p className="text-xs text-gray-400 mb-2">Images must NOT be in any of these albums (unless also in include albums)</p>
+                        <input
+                          type="text"
+                          placeholder="Search albums to exclude..."
+                          value={excludeAlbumSearch}
+                          onChange={(e) => setExcludeAlbumSearch(e.target.value)}
+                          className="w-full px-3 py-2 mb-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        <div className="max-h-40 overflow-y-auto bg-gray-700 rounded-lg p-3 space-y-1">
+                          {getFilteredAlbums(excludeAlbumSearch).map(album => (
+                            <label key={album.id} className="flex items-center text-sm">
+                              <input
+                                type="checkbox"
+                                checked={editFormData.excludeAlbums.includes(album.id)}
+                                onChange={() => handleAlbumToggle(album.id, "excludeAlbums")}
+                                className="mr-2 w-4 h-4 text-red-600 bg-gray-600 border-gray-500 rounded focus:ring-red-500"
+                              />
+                              <span className="text-xs text-gray-400 mr-2">📁</span>
+                              {album.name}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Selected Albums Pills */}
+                      {(editFormData.includeAlbums.length > 0 || editFormData.excludeAlbums.length > 0) && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium mb-2 text-gray-300">Selected Albums</label>
+                          <div className="flex flex-wrap gap-2">
+                            {getSelectedAlbums(editFormData.includeAlbums).map(album => (
+                              <span
+                                key={`include-album-${album.id}`}
+                                className="inline-flex items-center px-2 py-1 rounded text-xs bg-green-600 text-white"
+                              >
+                                📁 {album.name}
+                                <button
+                                  type="button"
+                                  onClick={() => handleAlbumToggle(album.id, "includeAlbums")}
+                                  className="ml-1 text-white hover:text-gray-200"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                            {getSelectedAlbums(editFormData.excludeAlbums).map(album => (
+                              <span
+                                key={`exclude-album-${album.id}`}
+                                className="inline-flex items-center px-2 py-1 rounded text-xs bg-red-600 text-white"
+                              >
+                                📁 {album.name}
+                                <button
+                                  type="button"
+                                  onClick={() => handleAlbumToggle(album.id, "excludeAlbums")}
+                                  className="ml-1 text-white hover:text-gray-200"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       <div>
                         <label className="block text-sm font-medium mb-2 text-gray-300">Minimum Rating</label>
