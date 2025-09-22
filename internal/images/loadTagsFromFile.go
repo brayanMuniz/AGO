@@ -28,11 +28,15 @@ func LoadTagsFromFile(path string) ([]string, error) {
 
 	content := strings.TrimSpace(string(data))
 	content = strings.TrimSuffix(content, "%")
-	tags := strings.Split(content, ",")
+	rawTags := strings.Split(content, ",")
 
-	// Trim spaces
-	for i := range tags {
-		tags[i] = strings.TrimSpace(tags[i])
+	// Trim spaces and filter out empty strings
+	var tags []string
+	for _, tag := range rawTags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed != "" {
+			tags = append(tags, trimmed)
+		}
 	}
 
 	return tags, nil

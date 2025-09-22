@@ -389,8 +389,7 @@ const ImagePage: React.FC = () => {
                     { key: "copyright", name: "Series" },
                     { key: "artist", name: "Artist" },
                     { key: "rating", name: "Explicitness" },
-                    { key: "meta", name: "Meta" },
-                    { key: "uncategorized", name: "Uncategorized" }
+                    { key: "meta", name: "Meta" }
                   ];
 
                   return allCategories.map(({ key, name }) => {
