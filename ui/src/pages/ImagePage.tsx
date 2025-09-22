@@ -13,7 +13,7 @@ interface ImageData {
   favorite: boolean;
   likes: number;
   rating: number;
-  tags: { [category: string]: string[] };
+  tags: { [category: string]: Array<{ name: string; favorite: boolean }> };
 }
 
 const ImagePage: React.FC = () => {
@@ -144,8 +144,9 @@ const ImagePage: React.FC = () => {
         if (!newTags[category]) {
           newTags[category] = [];
         }
-        if (!newTags[category].includes(tag)) {
-          newTags[category] = [...newTags[category], tag];
+        const tagExists = newTags[category].some(t => t.name === tag);
+        if (!tagExists) {
+          newTags[category] = [...newTags[category], { name: tag, favorite: false }];
         }
         return { ...prev, tags: newTags };
       });
@@ -180,7 +181,7 @@ const ImagePage: React.FC = () => {
         if (!prev) return null;
         const newTags = { ...prev.tags };
         Object.keys(newTags).forEach(category => {
-          newTags[category] = newTags[category].filter(t => t !== tag);
+          newTags[category] = newTags[category].filter(t => t.name !== tag);
         });
         return { ...prev, tags: newTags };
       });
@@ -188,6 +189,50 @@ const ImagePage: React.FC = () => {
       console.log(`Tag "${tag}" removed`);
     } catch (error) {
       console.error("Error removing tag:", error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleToggleTagFavorite = async (tagName: string) => {
+    if (!imageData || isUpdating) return;
+
+    setIsUpdating(true);
+    try {
+      // First get the tag info to get its ID
+      const tagResponse = await fetch(`/api/categories/tag/${encodeURIComponent(tagName)}`);
+      if (!tagResponse.ok) {
+        throw new Error(`Failed to get tag info: ${tagResponse.status}`);
+      }
+      
+      const tagData = await tagResponse.json();
+      const tagId = tagData.id;
+      const currentFavorite = tagData.isFavorite;
+
+      // Toggle favorite status
+      const favoriteResponse = await fetch(`/api/user/favorite/tag/${tagId}`, {
+        method: currentFavorite ? "DELETE" : "POST",
+      });
+
+      if (!favoriteResponse.ok) {
+        throw new Error(`Failed to toggle favorite: ${favoriteResponse.status}`);
+      }
+
+      // Update local state
+      setImageData(prev => {
+        if (!prev) return null;
+        const newTags = { ...prev.tags };
+        Object.keys(newTags).forEach(category => {
+          newTags[category] = newTags[category].map(t => 
+            t.name === tagName ? { ...t, favorite: !currentFavorite } : t
+          );
+        });
+        return { ...prev, tags: newTags };
+      });
+
+      console.log(`Tag "${tagName}" favorite status toggled`);
+    } catch (error) {
+      console.error("Error toggling tag favorite:", error);
     } finally {
       setIsUpdating(false);
     }
@@ -343,7 +388,7 @@ const ImagePage: React.FC = () => {
                     { key: "character", name: "Character" },
                     { key: "copyright", name: "Series" },
                     { key: "artist", name: "Artist" },
-                    { key: "rating", name: "Rating" },
+                    { key: "rating", name: "Explicitness" },
                     { key: "meta", name: "Meta" },
                     { key: "uncategorized", name: "Uncategorized" }
                   ];
@@ -368,26 +413,37 @@ const ImagePage: React.FC = () => {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {tags.length > 0 ? (
-                            tags.map((tag, idx) => (
-                              isEditingTags ? (
+                            tags.map((tag, idx) => {
+                              const tagName = typeof tag === 'string' ? tag : tag.name;
+                              const isFavorite = typeof tag === 'object' && tag.favorite;
+                              return isEditingTags ? (
                                 <button
                                   key={idx}
-                                  onClick={() => handleRemoveTag(tag)}
+                                  onClick={() => handleRemoveTag(tagName)}
                                   className="inline-block px-2 py-1 rounded text-xs transition bg-red-600 hover:bg-red-500 text-white"
-                                  title={`Remove ${tag}`}
+                                  title={`Remove ${tagName}`}
                                 >
-                                  {tag} ×
+                                  {tagName} ×
                                 </button>
                               ) : (
                                 <Link
                                   key={idx}
-                                  to={`/tags/${encodeURIComponent(tag)}`}
-                                  className="inline-block px-2 py-1 rounded text-xs transition bg-pink-600 hover:bg-pink-500 text-white"
+                                  to={`/tags/${encodeURIComponent(tagName)}`}
+                                  className={`inline-block px-2 py-1 rounded text-xs transition ${
+                                    isFavorite 
+                                      ? "bg-yellow-500 hover:bg-yellow-400 text-black font-semibold" 
+                                      : "bg-gray-600 hover:bg-gray-500 text-white"
+                                  }`}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    handleToggleTagFavorite(tagName);
+                                  }}
+                                  title={`${tagName} (right-click to ${isFavorite ? 'unfavorite' : 'favorite'})`}
                                 >
-                                  {tag}
+                                  {tagName}
                                 </Link>
-                              )
-                            ))
+                              );
+                            })
                           ) : (
                             <span className="text-gray-500 text-sm italic">
                               {isEditingTags ? "No tags - click + to add" : "No tags"}
@@ -399,36 +455,33 @@ const ImagePage: React.FC = () => {
                   });
                 })()}
 
-                {/* Rating category */}
-                {imageData.tags.rating && imageData.tags.rating.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-gray-300 mb-2">Rating</h3>
-                    <div className="flex flex-wrap gap-1">
-                      {imageData.tags.rating.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-block px-2 py-1 rounded text-xs bg-yellow-600 text-white"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Year */}
                 {imageData.tags.year && imageData.tags.year.length > 0 && (
                   <div className="mb-4">
                     <h3 className="text-sm font-semibold text-gray-300 mb-2">Year</h3>
                     <div className="flex flex-wrap gap-1">
-                      {imageData.tags.year.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-block px-2 py-1 rounded text-xs bg-blue-600 text-white"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      {imageData.tags.year.map((tag, idx) => {
+                        const tagName = typeof tag === 'string' ? tag : tag.name;
+                        const isFavorite = typeof tag === 'object' && tag.favorite;
+                        return (
+                          <span
+                            key={idx}
+                            className={`inline-block px-2 py-1 rounded text-xs cursor-pointer transition ${
+                              isFavorite 
+                                ? "bg-yellow-500 hover:bg-yellow-400 text-black font-semibold" 
+                                : "bg-blue-600 hover:bg-blue-500 text-white"
+                            }`}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              handleToggleTagFavorite(tagName);
+                            }}
+                            title={`${tagName} (right-click to ${isFavorite ? 'unfavorite' : 'favorite'})`}
+                          >
+                            {tagName}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -444,7 +497,7 @@ const ImagePage: React.FC = () => {
         onClose={() => setModalOpen(false)}
         category={selectedCategory}
         onAddTag={handleAddTag}
-        existingTags={imageData ? Object.values(imageData.tags).flat() : []}
+        existingTags={imageData ? Object.values(imageData.tags).flat().map(t => t.name) : []}
       />
     </div>
   );

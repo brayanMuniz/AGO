@@ -99,17 +99,21 @@ func FindImageFile(phash string) (string, error) {
 	return "", fmt.Errorf("no matching image file found for %s", phash)
 }
 
-type ImageResult struct {
-	ID       int                 `json:"id"`
-	Phash    string              `json:"phash"`
-	Filename string              `json:"filename"`
-	Width    int                 `json:"width"`
-	Height   int                 `json:"height"`
-	Favorite bool                `json:"favorite"`
-	Likes    int                 `json:"likes"`
-	Rating   int                 `json:"rating"`
-	Tags     map[string][]string `json:"tags"` // Grouped by category
+type TagInfo struct {
+	Name     string `json:"name"`
+	Favorite bool   `json:"favorite"`
+}
 
+type ImageResult struct {
+	ID       int                    `json:"id"`
+	Phash    string                 `json:"phash"`
+	Filename string                 `json:"filename"`
+	Width    int                    `json:"width"`
+	Height   int                    `json:"height"`
+	Favorite bool                   `json:"favorite"`
+	Likes    int                    `json:"likes"`
+	Rating   int                    `json:"rating"`
+	Tags     map[string][]TagInfo   `json:"tags"` // Grouped by category with favorite info
 }
 
 func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
@@ -312,9 +316,9 @@ func GetImageByID(db *sql.DB, id int) (*ImageResult, error) {
 	return &img, nil
 }
 
-func GetTagsByImageID(db *sql.DB, imageID int) (map[string][]string, error) {
+func GetTagsByImageID(db *sql.DB, imageID int) (map[string][]TagInfo, error) {
 	query := `
-		SELECT tags.name, tags.category
+		SELECT tags.name, tags.category, tags.favorite
 		FROM tags
 		JOIN image_tags ON tags.id = image_tags.tag_id
 		WHERE image_tags.image_id = ?
@@ -326,12 +330,13 @@ func GetTagsByImageID(db *sql.DB, imageID int) (map[string][]string, error) {
 	}
 	defer rows.Close()
 
-	tagsByCategory := make(map[string][]string)
+	tagsByCategory := make(map[string][]TagInfo)
 
 	for rows.Next() {
 		var name string
 		var category sql.NullString
-		if err := rows.Scan(&name, &category); err != nil {
+		var favorite bool
+		if err := rows.Scan(&name, &category, &favorite); err != nil {
 			return nil, fmt.Errorf("scan tag: %w", err)
 		}
 
@@ -340,7 +345,12 @@ func GetTagsByImageID(db *sql.DB, imageID int) (map[string][]string, error) {
 			cat = category.String
 		}
 
-		tagsByCategory[cat] = append(tagsByCategory[cat], name)
+		tagInfo := TagInfo{
+			Name:     name,
+			Favorite: favorite,
+		}
+
+		tagsByCategory[cat] = append(tagsByCategory[cat], tagInfo)
 	}
 
 	return tagsByCategory, nil
