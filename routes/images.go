@@ -15,6 +15,7 @@ func RegisterImageRoutes(r *gin.RouterGroup, db *sql.DB) {
 		imageGroup.GET("/file/:filename", handlers.ServeImageFileHandler())
 		imageGroup.POST("/organize", handlers.OrganizeImagesHandler())
 		imageGroup.POST("/import", handlers.PopulateDatabaseHanlder(db))
+		imageGroup.POST("/export", handlers.ExportImagesHandler(db))
 
 		imageGroup.GET("/:id", handlers.GetImageByIDHandler(db))
 

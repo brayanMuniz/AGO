@@ -1,4 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
+
+interface ExportData {
+  images: number[];
+  exportName: string;
+  exportType: string;
+}
 
 interface ImageControlsBarProps {
   // Sorting controls
@@ -13,10 +19,15 @@ interface ImageControlsBarProps {
   imageSize: 'small' | 'medium' | 'large';
   onImageSizeChange: (size: 'small' | 'medium' | 'large') => void;
   
+  // Export controls
+  exportData?: ExportData;
+  onExport?: () => void;
+  
   // Optional: disable certain controls
   showSortControls?: boolean;
   showPaginationControls?: boolean;
   showImageSizeControls?: boolean;
+  showExportControls?: boolean;
 }
 
 const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
@@ -26,10 +37,14 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   onItemsPerPageChange,
   imageSize,
   onImageSizeChange,
+  exportData,
+  onExport,
   showSortControls = true,
   showPaginationControls = true,
   showImageSizeControls = true,
+  showExportControls = true,
 }) => {
+  const [showExportModal, setShowExportModal] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-gray-800 rounded-lg">
       {/* Sort By Dropdown */}
@@ -89,6 +104,69 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
               className="w-20 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
             />
             <span className="text-gray-400 text-xs">Large</span>
+          </div>
+        </div>
+      )}
+
+      {/* Export Button */}
+      {showExportControls && exportData && exportData.images.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded border border-green-500 focus:border-green-400 focus:outline-none transition-colors"
+          >
+            📤 Export ({exportData.images.length})
+          </button>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && exportData && onExport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-white mb-4">Export Images</h3>
+            
+            <div className="mb-4">
+              <p className="text-gray-300 mb-2">
+                Export <span className="font-semibold text-white">{exportData.images.length}</span> images from:
+              </p>
+              <p className="text-lg font-semibold text-blue-400">
+                {exportData.exportName}
+              </p>
+              <p className="text-sm text-gray-400 mt-1">
+                Type: {exportData.exportType}
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-300 text-sm mb-2">
+                Images will be exported to: <code className="bg-gray-700 px-2 py-1 rounded text-green-400">
+                  exports/{exportData.exportType === 'album' ? exportData.exportName.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '_') : `${exportData.exportType}__${exportData.exportName.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '_')}`}
+                </code>
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                <strong>Note:</strong> Only new images will be exported if the directory already exists.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  onExport();
+                  setShowExportModal(false);
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition-colors"
+              >
+                Export Images
+              </button>
+              
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

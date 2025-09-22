@@ -73,6 +73,7 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   const [sortBy, setSortBy] = useState("random");
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [imageSize, setImageSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleImageSelect = (imageId: number) => {
     if (!isSelectingImages) return;
@@ -164,6 +165,43 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       }
     } catch (e) {
       console.error('Failed to fetch tag info:', e);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!entityName || images.length === 0) return;
+
+    setIsExporting(true);
+    try {
+      const imageIds = images.map(img => img.id);
+      
+      const response = await fetch('/api/images/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          images: imageIds,
+          export_name: entityName,
+          export_type: entityTypeSingular.toLowerCase(),
+          update_only: true, // Always use update mode
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const result = await response.json();
+      
+      // Show success message
+      alert(`Export completed!\nExported: ${result.exported_count} images\nSkipped: ${result.skipped_count} images\nPath: ${result.export_path}`);
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -285,6 +323,12 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
             onItemsPerPageChange={setItemsPerPage}
             imageSize={imageSize}
             onImageSizeChange={setImageSize}
+            exportData={entityName ? {
+              images: images.map(img => img.id),
+              exportName: entityName,
+              exportType: entityTypeSingular.toLowerCase()
+            } : undefined}
+            onExport={handleExport}
           />
 
           {/* Error Display */}

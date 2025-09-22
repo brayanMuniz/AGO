@@ -3,9 +3,11 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -348,4 +350,155 @@ func PopulateDatabaseHanlder(db *sql.DB) gin.HandlerFunc {
 		ctx.JSON(200, gin.H{"status": "Imported images from tag files"})
 
 	}
+}
+
+// ExportImagesRequest represents the request body for exporting images
+type ExportImagesRequest struct {
+	Images      []int  `json:"images"`      // Array of image IDs to export
+	ExportName  string `json:"export_name"` // Name for the export directory
+	ExportType  string `json:"export_type"` // Type: "album", "series", "character", etc.
+	UpdateOnly  bool   `json:"update_only"` // If true, only export new images
+}
+
+// ExportImagesHandler handles exporting images to a directory
+func ExportImagesHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req ExportImagesRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		if len(req.Images) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No images specified for export"})
+			return
+		}
+
+		// Create exports directory if it doesn't exist
+		exportsDir := "exports"
+		if err := os.MkdirAll(exportsDir, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create exports directory"})
+			return
+		}
+
+		// Generate export directory name
+		exportDirName := generateExportDirName(req.ExportName, req.ExportType, exportsDir)
+		exportPath := filepath.Join(exportsDir, exportDirName)
+
+		// Create export directory
+		if err := os.MkdirAll(exportPath, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create export directory"})
+			return
+		}
+
+		// Get existing files if update_only is true
+		var existingFiles map[string]bool
+		if req.UpdateOnly {
+			existingFiles = getExistingFiles(exportPath)
+		}
+
+		// Export images
+		exportedCount := 0
+		skippedCount := 0
+		
+		for _, imageID := range req.Images {
+			// Get image details from database
+			image, err := database.GetImageByID(db, imageID)
+			if err != nil {
+				fmt.Printf("Failed to get image %d: %v\n", imageID, err)
+				continue
+			}
+
+			// Skip if update_only and file already exists
+			if req.UpdateOnly && existingFiles[image.Filename] {
+				skippedCount++
+				continue
+			}
+
+			// Copy image file
+			sourcePath := filepath.Join("gallery", image.Filename)
+			destPath := filepath.Join(exportPath, image.Filename)
+
+			if err := copyFile(sourcePath, destPath); err != nil {
+				fmt.Printf("Failed to copy image %s: %v\n", image.Filename, err)
+				continue
+			}
+
+			exportedCount++
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Export completed",
+			"export_path": exportPath,
+			"exported_count": exportedCount,
+			"skipped_count": skippedCount,
+			"total_requested": len(req.Images),
+		})
+	}
+}
+
+// generateExportDirName creates a unique directory name for exports
+func generateExportDirName(name, exportType, exportsDir string) string {
+	// Clean the name for filesystem use
+	cleanName := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(name, "_")
+	cleanName = strings.ToLower(cleanName)
+	
+	// Add type prefix if not album
+	var dirName string
+	if exportType == "album" {
+		dirName = cleanName
+	} else {
+		dirName = fmt.Sprintf("%s__%s", exportType, cleanName)
+	}
+
+	// Check for conflicts and append number if needed
+	originalDirName := dirName
+	counter := 1
+	
+	for {
+		fullPath := filepath.Join(exportsDir, dirName)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			break
+		}
+		dirName = fmt.Sprintf("%s-%d", originalDirName, counter)
+		counter++
+	}
+
+	return dirName
+}
+
+// getExistingFiles returns a map of existing filenames in the directory
+func getExistingFiles(dirPath string) map[string]bool {
+	existingFiles := make(map[string]bool)
+	
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		return existingFiles
+	}
+	
+	for _, file := range files {
+		if !file.IsDir() {
+			existingFiles[file.Name()] = true
+		}
+	}
+	
+	return existingFiles
+}
+
+// copyFile copies a file from source to destination
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	return err
 }

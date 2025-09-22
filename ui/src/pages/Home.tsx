@@ -110,6 +110,7 @@ const Home = () => {
             onItemsPerPageChange={handleItemsPerPageChange}
             imageSize={imageSize}
             onImageSizeChange={handleImageSizeChange}
+            showExportControls={false}
           />
 
           {/* Error Display */}

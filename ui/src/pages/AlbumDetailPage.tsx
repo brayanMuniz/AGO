@@ -71,6 +71,7 @@ const AlbumDetailPage: React.FC = () => {
   const [sortBy, setSortBy] = useState("random");
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [imageSize, setImageSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const fetchAlbumData = async () => {
@@ -373,6 +374,43 @@ const AlbumDetailPage: React.FC = () => {
     );
   };
 
+  const handleExport = async () => {
+    if (!album || images.length === 0) return;
+
+    setIsExporting(true);
+    try {
+      const imageIds = images.map(img => img.id);
+      
+      const response = await fetch('/api/images/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          images: imageIds,
+          export_name: album.name,
+          export_type: 'album',
+          update_only: true, // Always use update mode
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const result = await response.json();
+      
+      // Show success message
+      alert(`Export completed!\nExported: ${result.exported_count} images\nSkipped: ${result.skipped_count} images\nPath: ${result.export_path}`);
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const openEditForm = async () => {
     if (album) {
       let formData = {
@@ -558,6 +596,12 @@ const AlbumDetailPage: React.FC = () => {
             onItemsPerPageChange={setItemsPerPage}
             imageSize={imageSize}
             onImageSizeChange={setImageSize}
+            exportData={album ? {
+              images: images.map(img => img.id),
+              exportName: album.name,
+              exportType: 'album'
+            } : undefined}
+            onExport={handleExport}
           />
 
           {/* Error Display */}
