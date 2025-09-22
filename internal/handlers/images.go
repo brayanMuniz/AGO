@@ -131,7 +131,7 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 			ctx.JSON(400, gin.H{"error": "Missing tags parameter"})
 			return
 		}
-		
+
 		// Parse pagination parameters
 		page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 		limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "20"))
@@ -148,14 +148,14 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		for i := range tagList {
 			tagList[i] = strings.TrimSpace(tagList[i])
 		}
-		
+
 		// Get paginated results
 		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		
+
 		totalPages := (totalCount + limit - 1) / limit
 
 		ctx.JSON(200, gin.H{

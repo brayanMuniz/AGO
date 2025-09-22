@@ -199,7 +199,7 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 	}
 
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(tags)), ",")
-	
+
 	// Get total count first
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(DISTINCT images.id)
@@ -224,7 +224,7 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		return nil, 0, err
 	}
 	defer countRows.Close()
-	
+
 	for countRows.Next() {
 		totalCount++
 	}

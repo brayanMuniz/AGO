@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"strings"
 	"github.com/brayanMuniz/AGO/database"
 	"github.com/gin-gonic/gin"
 	"strconv"
@@ -318,6 +319,59 @@ func DeleteAlbumHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		c.Status(204)
+	}
+}
+
+func UpdateAlbumHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		albumIDStr := c.Param("id")
+		albumID, err := strconv.Atoi(albumIDStr)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid album ID"})
+			return
+		}
+
+		var input struct {
+			Name         *string `json:"name"`
+			CoverImageID *int    `json:"cover_image_id"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		// Build dynamic update query
+		updates := []string{}
+		args := []interface{}{}
+
+		if input.Name != nil {
+			updates = append(updates, "name = ?")
+			args = append(args, *input.Name)
+		}
+
+		if input.CoverImageID != nil {
+			updates = append(updates, "cover_image_id = ?")
+			args = append(args, *input.CoverImageID)
+		}
+
+		if len(updates) == 0 {
+			c.JSON(400, gin.H{"error": "No fields to update"})
+			return
+		}
+
+		// Add album ID to args
+		args = append(args, albumID)
+
+		query := "UPDATE albums SET " + strings.Join(updates, ", ") + " WHERE id = ?"
+		_, err = db.Exec(query, args...)
+
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update album"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Album updated successfully"})
 	}
 }
 

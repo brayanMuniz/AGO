@@ -252,6 +252,23 @@ const AlbumDetailPage: React.FC = () => {
     if (!album) return;
 
     try {
+      // Update album name if it changed
+      if (editFormData.name !== album.name) {
+        const nameResponse = await fetch(`/api/albums/${album.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: editFormData.name,
+          }),
+        });
+
+        if (!nameResponse.ok) {
+          throw new Error("Failed to update album name");
+        }
+      }
+
       if (album.type === "smart") {
         const response = await fetch(`/api/albums/${album.id}/filters`, {
           method: "PUT",
@@ -268,18 +285,19 @@ const AlbumDetailPage: React.FC = () => {
         });
 
         if (!response.ok) {
-          throw new Error("Failed to update smart album");
+          throw new Error("Failed to update smart album filters");
         }
 
         // Refresh album images after updating filters
         await fetchImages(1);
       }
 
-      // Update album name would require a separate endpoint
+      // Update local state with new name
       setAlbum(prev => prev ? { ...prev, name: editFormData.name } : null);
       setShowEditForm(false);
     } catch (error) {
       console.error("Error updating album:", error);
+      alert("Failed to update album. Please try again.");
     }
   };
 
