@@ -474,3 +474,60 @@ func AddImagesToAlbumHandler(db *sql.DB) gin.HandlerFunc {
 		c.JSON(200, gin.H{"message": "Images added to album successfully"})
 	}
 }
+
+func RemoveImagesFromAlbumHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		albumIDStr := c.Param("id")
+		albumID, err := strconv.Atoi(albumIDStr)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid album ID"})
+			return
+		}
+
+		var input struct {
+			ImageIds []int `json:"imageIds"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		if len(input.ImageIds) == 0 {
+			c.JSON(400, gin.H{"error": "No image IDs provided"})
+			return
+		}
+
+		// Verify album exists and is manual
+		var albumType string
+		err = db.QueryRow("SELECT type FROM albums WHERE id = ?", albumID).Scan(&albumType)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(404, gin.H{"error": "Album not found"})
+				return
+			}
+			c.JSON(500, gin.H{"error": "Database error"})
+			return
+		}
+
+		if albumType != "manual" {
+			c.JSON(400, gin.H{"error": "Can only remove images from manual albums"})
+			return
+		}
+
+		// Remove images from album
+		for _, imageID := range input.ImageIds {
+			_, err = db.Exec(`
+				DELETE FROM album_images 
+				WHERE album_id = ? AND image_id = ?`,
+				albumID, imageID,
+			)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "Failed to remove images from album"})
+				return
+			}
+		}
+
+		c.JSON(200, gin.H{"message": "Images removed from album successfully"})
+	}
+}

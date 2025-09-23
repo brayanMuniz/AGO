@@ -43,6 +43,12 @@ const AlbumDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSettingCover, setIsSettingCover] = useState(false);
   const [isUpdatingCover, setIsUpdatingCover] = useState(false);
+  const [isSelectingImages, setIsSelectingImages] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState("");
   const [showEditForm, setShowEditForm] = useState(false);
   const [editFormData, setEditFormData] = useState({
     name: "",
@@ -116,6 +122,87 @@ const AlbumDetailPage: React.FC = () => {
       fetchImages(1);
     }
   }, [sortBy, itemsPerPage]);
+
+  const handleImageSelect = (imageId: number) => {
+    if (!isSelectingImages) return;
+    
+    const newSelected = new Set(selectedImages);
+    if (newSelected.has(imageId)) {
+      newSelected.delete(imageId);
+    } else {
+      newSelected.add(imageId);
+    }
+    setSelectedImages(newSelected);
+  };
+
+  const removeImagesFromAlbum = async () => {
+    if (!album || selectedImages.size === 0) return;
+    
+    setIsRemoving(true);
+    try {
+      const imageIds = Array.from(selectedImages);
+      const response = await fetch(`/api/albums/${album.id}/images`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageIds }),
+      });
+      
+      if (response.ok) {
+        // Remove images from local state with smooth transition
+        setImages(prevImages => 
+          prevImages.filter(img => !selectedImages.has(img.id))
+        );
+        
+        // Update pagination count
+        setPagination(prev => ({
+          ...prev,
+          total_count: prev.total_count - selectedImages.size
+        }));
+        
+        // Reset selection state and exit all modes
+        setSelectedImages(new Set());
+        setIsSelectingImages(false);
+        setShowRemoveModal(false);
+        
+        console.log(`Successfully removed ${imageIds.length} images from album`);
+      } else {
+        console.error('Failed to remove images from album');
+        alert('Failed to remove images from album. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error removing images from album:', error);
+      alert('Failed to remove images from album. Please try again.');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const handleNameEdit = async () => {
+    if (!album || !editingName.trim()) return;
+    
+    try {
+      const response = await fetch(`/api/albums/${album.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: editingName.trim() }),
+      });
+      
+      if (response.ok) {
+        setAlbum(prev => prev ? { ...prev, name: editingName.trim() } : null);
+        setIsEditingName(false);
+      } else {
+        console.error('Failed to update album name');
+        alert('Failed to update album name. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating album name:', error);
+      alert('Failed to update album name. Please try again.');
+    }
+  };
 
   const handleSetCover = async (imageId: number) => {
     if (!album || isUpdatingCover) return;
@@ -536,9 +623,64 @@ const AlbumDetailPage: React.FC = () => {
               >
                 ← 
               </Link>
-              <h1 className="text-3xl font-bold text-gray-100">
-                📁 {album.name}
-              </h1>
+              
+              {/* Inline Album Name Editing */}
+              <div className="flex items-center gap-2">
+                <span className="text-3xl">📁</span>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleNameEdit();
+                        } else if (e.key === 'Escape') {
+                          setIsEditingName(false);
+                          setEditingName(album.name);
+                        }
+                      }}
+                      className="text-3xl font-bold bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleNameEdit}
+                      className="text-green-500 hover:text-green-400 text-xl"
+                      title="Save name"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingName(false);
+                        setEditingName(album.name);
+                      }}
+                      className="text-red-500 hover:text-red-400 text-xl"
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-3xl font-bold text-gray-100">
+                      {album.name}
+                    </h1>
+                    <button
+                      onClick={() => {
+                        setIsEditingName(true);
+                        setEditingName(album.name);
+                      }}
+                      className="text-gray-400 hover:text-gray-200 text-sm"
+                      title="Edit album name"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                )}
+              </div>
+              
               <span className={`px-3 py-1 rounded text-sm ${
                 album.type === "smart" 
                   ? "bg-purple-600 text-white" 
@@ -550,7 +692,16 @@ const AlbumDetailPage: React.FC = () => {
               {/* Action Buttons */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => setIsSettingCover(!isSettingCover)}
+                  onClick={() => {
+                    if (isSettingCover) {
+                      setIsSettingCover(false);
+                    } else if (isSelectingImages) {
+                      setIsSelectingImages(false);
+                      setSelectedImages(new Set());
+                    } else {
+                      setIsSettingCover(true);
+                    }
+                  }}
                   disabled={isUpdatingCover || images.length === 0}
                   className={`px-3 py-1 rounded text-sm transition ${
                     isSettingCover 
@@ -559,15 +710,40 @@ const AlbumDetailPage: React.FC = () => {
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                   title={images.length === 0 ? "No images available for cover" : "Click an image to set as cover"}
                 >
-                  {isUpdatingCover ? "Updating..." : "Set Cover"}
+                  {isUpdatingCover ? "Updating..." : isSettingCover ? "Cancel Cover" : "Set Cover"}
                 </button>
                 
-                <button
-                  onClick={openEditForm}
-                  className="px-3 py-1 rounded text-sm transition bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Edit Album
-                </button>
+                {album.type === "manual" && (
+                  <button
+                    onClick={() => {
+                      if (isSelectingImages) {
+                        setIsSelectingImages(false);
+                        setSelectedImages(new Set());
+                      } else {
+                        setIsSelectingImages(true);
+                        setIsSettingCover(false);
+                      }
+                    }}
+                    disabled={images.length === 0}
+                    className={`px-3 py-1 rounded text-sm transition ${
+                      isSelectingImages
+                        ? "bg-red-600 hover:bg-red-700 text-white" 
+                        : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    title={images.length === 0 ? "No images available" : "Select images to remove from album"}
+                  >
+                    {isSelectingImages ? "Cancel Selection" : "Remove Images"}
+                  </button>
+                )}
+                
+                {album.type === "smart" && (
+                  <button
+                    onClick={openEditForm}
+                    className="px-3 py-1 rounded text-sm transition bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Edit Filters
+                  </button>
+                )}
               </div>
             </div>
             <div className="text-gray-400 text-sm">
@@ -585,6 +761,26 @@ const AlbumDetailPage: React.FC = () => {
               >
                 Cancel
               </button>
+            </div>
+          )}
+
+          {/* Image selection mode instructions */}
+          {isSelectingImages && images.length > 0 && (
+            <div className="mb-4 p-4 bg-red-900 rounded-lg">
+              <p className="text-red-200 text-sm mb-2">Click on images to select them for removal from this album</p>
+              <div className="flex gap-2 items-center">
+                <span className="text-red-300 text-sm">
+                  {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} selected
+                </span>
+                {selectedImages.size > 0 && (
+                  <button
+                    onClick={() => setShowRemoveModal(true)}
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition"
+                  >
+                    Remove {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} from album
+                  </button>
+                )}
+              </div>
             </div>
           )}
           
@@ -623,6 +819,9 @@ const AlbumDetailPage: React.FC = () => {
               images={images}
               imageSize={imageSize}
               onImageClick={isSettingCover ? handleSetCover : undefined}
+              isSelecting={isSelectingImages}
+              selectedImages={selectedImages}
+              onImageSelect={handleImageSelect}
             />
           </div>
           
@@ -902,6 +1101,46 @@ const AlbumDetailPage: React.FC = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Remove Images Confirmation Modal */}
+          {showRemoveModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 className="text-xl font-bold text-red-400 mb-4">
+                  ⚠️ Remove Images from Album
+                </h3>
+                
+                <div className="mb-6">
+                  <p className="text-gray-300 mb-3">
+                    Are you sure you want to remove {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} from <span className="font-semibold text-blue-400">"{album?.name}"</span>?
+                  </p>
+                  <p className="text-gray-400 text-sm">
+                    This action cannot be undone. The images will be removed from this album but will remain in your collection.
+                  </p>
+                </div>
+                
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setShowRemoveModal(false)}
+                    disabled={isRemoving}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={removeImagesFromAlbum}
+                    disabled={isRemoving}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isRemoving && (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    {isRemoving ? 'Removing...' : `Remove ${selectedImages.size} image${selectedImages.size !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -21,6 +21,7 @@ func RegisterAlbumRoutes(r *gin.RouterGroup, db *sql.DB) {
 	albumGroup.POST("/:id/images/:imageId", handlers.AddImageToAlbumHandler(db))
 	albumGroup.DELETE("/:id/images/:imageId", handlers.RemoveImageFromAlbumHandler(db))
 	albumGroup.POST("/:id/images", handlers.AddImagesToAlbumHandler(db))
+	albumGroup.DELETE("/:id/images", handlers.RemoveImagesFromAlbumHandler(db))
 
 	// Smart album filter management
 	albumGroup.GET("/:id/filters", handlers.GetSmartAlbumFiltersHandler(db))
