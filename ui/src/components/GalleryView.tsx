@@ -80,8 +80,8 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
       return;
     }
     
-    // Handle left click normally
-    if (e.button === 0) {
+    // Handle left click normally - but only if there's no custom onImageClick handler
+    if (e.button === 0 && !onImageClick) {
       handleImageClick(imageId, index);
     }
   };
@@ -153,7 +153,11 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
           return onImageClick ? (
             <div
               key={img.id}
-              onClick={() => onImageClick(img.id)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onImageClick(img.id);
+              }}
               onMouseDown={(e) => handleImageMouseDown(e, img.id, index)}
               className="break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer hover:ring-2 hover:ring-pink-500"
             >

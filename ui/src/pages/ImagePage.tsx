@@ -243,6 +243,22 @@ const ImagePage: React.FC = () => {
     setModalOpen(true);
   };
 
+  // Function to get the correct route for a tag based on its category
+  const getTagRoute = (tagName: string, category: string): string => {
+    const categoryRoutes: { [key: string]: string } = {
+      'general': '/tags',
+      'character': '/characters',
+      'copyright': '/series',
+      'artist': '/artists',
+      'rating': '/explicitness',
+      'meta': '/tags', // Meta tags go to general tags page
+      'year': '/tags'  // Year tags go to general tags page
+    };
+
+    const basePath = categoryRoutes[category] || '/tags';
+    return `${basePath}/${encodeURIComponent(tagName)}`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900">
@@ -427,7 +443,7 @@ const ImagePage: React.FC = () => {
                               ) : (
                                 <Link
                                   key={idx}
-                                  to={`/tags/${encodeURIComponent(tagName)}`}
+                                  to={getTagRoute(tagName, key)}
                                   className={`inline-block px-2 py-1 rounded text-xs transition ${
                                     isFavorite 
                                       ? "bg-yellow-500 hover:bg-yellow-400 text-black font-semibold" 
@@ -464,8 +480,9 @@ const ImagePage: React.FC = () => {
                         const tagName = typeof tag === 'string' ? tag : tag.name;
                         const isFavorite = typeof tag === 'object' && tag.favorite;
                         return (
-                          <span
+                          <Link
                             key={idx}
+                            to={getTagRoute(tagName, 'year')}
                             className={`inline-block px-2 py-1 rounded text-xs cursor-pointer transition ${
                               isFavorite 
                                 ? "bg-yellow-500 hover:bg-yellow-400 text-black font-semibold" 
@@ -478,7 +495,7 @@ const ImagePage: React.FC = () => {
                             title={`${tagName} (right-click to ${isFavorite ? 'unfavorite' : 'favorite'})`}
                           >
                             {tagName}
-                          </span>
+                          </Link>
                         );
                       })}
                     </div>

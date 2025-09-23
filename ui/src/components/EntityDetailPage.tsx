@@ -44,12 +44,14 @@ interface EntityDetailPageProps {
   detailsResponseKey: string;
   backLink: string;
   icon: string;
+  tagFormatter?: (entityName: string) => string;
 }
 
 const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   entityTypeSingular,
   paramName,
   icon,
+  tagFormatter,
 }) => {
   const params = useParams<{ [key: string]: string }>();
   const entityName = params[paramName];
@@ -61,6 +63,9 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
   const [showAlbumModal, setShowAlbumModal] = useState(false);
   const [manualAlbums, setManualAlbums] = useState<any[]>([]);
+  const [isRemovingTags, setIsRemovingTags] = useState(false);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
     current_page: 1,
@@ -122,6 +127,57 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
     }
   };
 
+  const removeTagFromImages = async () => {
+    if (!entityName || selectedImages.size === 0) return;
+    
+    setIsRemoving(true);
+    try {
+      const imageIds = Array.from(selectedImages);
+      const tagName = tagFormatter ? tagFormatter(entityName) : entityName;
+      const promises = imageIds.map(imageId => 
+        fetch(`/api/images/${imageId}/tags`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ tag: tagName }),
+        })
+      );
+      
+      const responses = await Promise.all(promises);
+      const failedRemovals = responses.filter(response => !response.ok);
+      
+      if (failedRemovals.length === 0) {
+        // Remove images from local state with smooth transition
+        setImages(prevImages => 
+          prevImages.filter(img => !selectedImages.has(img.id))
+        );
+        
+        // Update pagination count
+        setPagination(prev => ({
+          ...prev,
+          total_count: prev.total_count - selectedImages.size
+        }));
+        
+        // Reset selection state and exit all modes
+        setSelectedImages(new Set());
+        setIsRemovingTags(false);
+        setIsSelectingImages(false);
+        setShowRemoveModal(false);
+        
+        console.log(`Successfully removed ${tagName} from ${imageIds.length} images`);
+      } else {
+        console.error(`Failed to remove tag from ${failedRemovals.length} images`);
+        alert(`Failed to remove tag from ${failedRemovals.length} images. Please try again.`);
+      }
+    } catch (error) {
+      console.error('Error removing tag from images:', error);
+      alert('Failed to remove tag from images. Please try again.');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
   const fetchImages = async (page: number = 1) => {
     if (!entityName) {
       setError(`No ${entityTypeSingular.toLowerCase()} provided`);
@@ -132,7 +188,8 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       setLoading(true);
       setError(null);
       
-      const url = `/api/images/by-tags?tags=${encodeURIComponent(entityName)}&page=${page}&limit=${itemsPerPage}&sort=${sortBy}`;
+      const tagName = tagFormatter ? tagFormatter(entityName) : entityName;
+      const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${page}&limit=${itemsPerPage}&sort=${sortBy}`;
       const res = await fetch(url);
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -271,36 +328,67 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
                 </button>
               )}
             </div>
-            <button
-              onClick={() => {
-                if (isSelectingImages) {
-                  setIsSelectingImages(false);
-                  setSelectedImages(new Set());
-                } else {
-                  setIsSelectingImages(true);
-                }
-              }}
-              disabled={images.length === 0}
-              className={`px-4 py-2 rounded text-sm transition ${
-                isSelectingImages 
-                  ? "bg-pink-600 hover:bg-pink-700 text-white" 
-                  : "bg-gray-700 hover:bg-gray-600 text-gray-300"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={images.length === 0 ? "No images available" : "Select images to add to album"}
-            >
-              {isSelectingImages ? "Cancel Selection" : "Add to Album"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (isSelectingImages) {
+                    setIsSelectingImages(false);
+                    setSelectedImages(new Set());
+                    setIsRemovingTags(false);
+                  } else {
+                    setIsSelectingImages(true);
+                    setIsRemovingTags(false);
+                  }
+                }}
+                disabled={images.length === 0}
+                className={`px-4 py-2 rounded text-sm transition ${
+                  isSelectingImages && !isRemovingTags
+                    ? "bg-pink-600 hover:bg-pink-700 text-white" 
+                    : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                title={images.length === 0 ? "No images available" : "Select images to add to album"}
+              >
+                {isSelectingImages && !isRemovingTags ? "Cancel Selection" : "Add to Album"}
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (isRemovingTags) {
+                    setIsRemovingTags(false);
+                    setSelectedImages(new Set());
+                    setIsSelectingImages(false);
+                  } else {
+                    setIsRemovingTags(true);
+                    setIsSelectingImages(true);
+                  }
+                }}
+                disabled={images.length === 0}
+                className={`px-4 py-2 rounded text-sm transition ${
+                  isRemovingTags
+                    ? "bg-red-600 hover:bg-red-700 text-white" 
+                    : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                title={images.length === 0 ? "No images available" : `Remove ${entityName} tag from selected images`}
+              >
+                {isRemovingTags ? "Cancel Removal" : `Remove ${entityTypeSingular}`}
+              </button>
+            </div>
           </div>
           
           {/* Selection mode instructions */}
           {isSelectingImages && images.length > 0 && (
-            <div className="mb-4 p-4 bg-blue-900 rounded-lg">
-              <p className="text-blue-200 text-sm mb-2">Click on images to select them, then choose an album to add them to</p>
+            <div className={`mb-4 p-4 rounded-lg ${isRemovingTags ? 'bg-red-900' : 'bg-blue-900'}`}>
+              <p className={`text-sm mb-2 ${isRemovingTags ? 'text-red-200' : 'text-blue-200'}`}>
+                {isRemovingTags 
+                  ? `Click on images to select them for ${entityName} tag removal`
+                  : 'Click on images to select them, then choose an album to add them to'
+                }
+              </p>
               <div className="flex gap-2 items-center">
-                <span className="text-blue-300 text-sm">
+                <span className={`text-sm ${isRemovingTags ? 'text-red-300' : 'text-blue-300'}`}>
                   {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} selected
                 </span>
-                {selectedImages.size > 0 && (
+                {selectedImages.size > 0 && !isRemovingTags && (
                   <button
                     onClick={() => {
                       fetchManualAlbums();
@@ -309,6 +397,14 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
                     className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition"
                   >
                     Choose Album
+                  </button>
+                )}
+                {selectedImages.size > 0 && isRemovingTags && (
+                  <button
+                    onClick={() => setShowRemoveModal(true)}
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition"
+                  >
+                    Remove {entityTypeSingular} from {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''}
                   </button>
                 )}
               </div>
@@ -398,6 +494,46 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
                 className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Tag Confirmation Modal */}
+      {showRemoveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-red-400 mb-4">
+              ⚠️ Remove {entityTypeSingular} Tag
+            </h3>
+            
+            <div className="mb-6">
+              <p className="text-gray-300 mb-3">
+                Are you sure you want to remove the <span className="font-semibold text-red-400">"{entityName}"</span> tag from {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''}?
+              </p>
+              <p className="text-gray-400 text-sm">
+                This action cannot be undone. The images will be removed from this {entityTypeSingular.toLowerCase()} page.
+              </p>
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowRemoveModal(false)}
+                disabled={isRemoving}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={removeTagFromImages}
+                disabled={isRemoving}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isRemoving && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                {isRemoving ? 'Removing...' : `Remove from ${selectedImages.size} image${selectedImages.size !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>
