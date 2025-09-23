@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SimpleImageControls from './SimpleImageControls';
-import { getImageUrl, preloadNextImages } from '../utils/imageLoader';
+import { getImageUrl, debouncedPreloadImages } from '../utils/imageLoader';
 
 interface ImageItem {
   id: number;
@@ -58,23 +58,31 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     loadImageData();
   }, [currentImage]);
 
-  // Preload next 5 images for smooth navigation
+  // Dynamic preloading: load next 5 and previous 5 images as user navigates
   useEffect(() => {
     if (images.length > 0 && currentIndex >= 0) {
-      const nextImages: string[] = [];
+      const imagesToPreload: string[] = [];
       
-      // Get next 5 images (or remaining images if less than 5)
-      for (let i = 1; i <= 5 && currentIndex + i < images.length; i++) {
-        nextImages.push(images[currentIndex + i].filename);
+      // Preload next 5 images (or remaining images if less than 5)
+      const nextCount = Math.min(5, images.length - currentIndex - 1);
+      for (let i = 1; i <= nextCount; i++) {
+        imagesToPreload.push(images[currentIndex + i].filename);
       }
       
-      // Also preload previous 2 images for backward navigation
-      for (let i = 1; i <= 2 && currentIndex - i >= 0; i++) {
-        nextImages.push(images[currentIndex - i].filename);
+      // Preload previous 5 images (or available images if less than 5)
+      const prevCount = Math.min(5, currentIndex);
+      for (let i = 1; i <= prevCount; i++) {
+        imagesToPreload.push(images[currentIndex - i].filename);
       }
       
-      if (nextImages.length > 0) {
-        preloadNextImages(nextImages, 'original');
+      // Only preload if we have images to preload
+      if (imagesToPreload.length > 0) {
+        console.log(`Preloading ${imagesToPreload.length} images around index ${currentIndex}:`, {
+          next: nextCount,
+          prev: prevCount,
+          total: images.length
+        });
+        debouncedPreloadImages(imagesToPreload, 'original', 200);
       }
     }
   }, [currentIndex, images]);

@@ -30,6 +30,7 @@ class ImageLoadQueue {
   private activeLoads = new Set<string>();
   private pendingQueue: Array<() => void> = [];
   private loadCache = new Map<string, Promise<ImageLoadResult>>();
+  private preloadDebounceTimer: number | null = null;
 
   // Get the URL for an image with size parameter
   getImageUrl(filename: string, size: ImageSize = 'medium'): string {
@@ -167,6 +168,20 @@ class ImageLoadQueue {
     });
   }
 
+  // Debounced preloading to prevent excessive loading during rapid navigation
+  debouncedPreloadImages(filenames: string[], options: ImageLoadOptions = {}, delay: number = 300): void {
+    // Clear existing timer
+    if (this.preloadDebounceTimer) {
+      clearTimeout(this.preloadDebounceTimer);
+    }
+
+    // Set new timer
+    this.preloadDebounceTimer = window.setTimeout(() => {
+      this.preloadImages(filenames, options);
+      this.preloadDebounceTimer = null;
+    }, delay);
+  }
+
   // Clear cache for memory management
   clearCache(): void {
     this.loadCache.clear();
@@ -243,6 +258,11 @@ export async function loadFullImage(filename: string): Promise<ImageLoadResult> 
 // Preload next images for smooth navigation
 export function preloadNextImages(filenames: string[], size: ImageSize = 'original'): void {
   imageLoader.preloadImages(filenames, { size, priority: 'low' });
+}
+
+// Debounced preloading for rapid navigation scenarios
+export function debouncedPreloadImages(filenames: string[], size: ImageSize = 'original', delay: number = 300): void {
+  imageLoader.debouncedPreloadImages(filenames, { size, priority: 'low' }, delay);
 }
 
 // Get optimized image URL without loading
