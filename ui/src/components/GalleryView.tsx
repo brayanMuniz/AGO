@@ -2,7 +2,9 @@ import React, { useState, useEffect } from "react";
 import Masonry from "react-masonry-css";
 import ImageViewer from "./ImageViewer";
 import IntelligentImage from "./IntelligentImage";
+import SkeletonImage from "./SkeletonImage";
 import { loadGalleryImages, preloadNextImages, getAdaptiveImageSize } from "../utils/imageLoader";
+import { useSidebar } from "../contexts/SidebarContext";
 
 interface ImageItem {
   id: number;
@@ -18,18 +20,23 @@ interface GalleryViewProps {
   onImageSelect?: (imageId: number) => void;
   onImageClick?: (imageId: number) => void;
   imageSize?: 'small' | 'medium' | 'large';
+  isLoading?: boolean;
+  expectedCount?: number;
 }
 
-const getBreakpointColumns = (size: 'small' | 'medium' | 'large') => {
+const getBreakpointColumns = (size: 'small' | 'medium' | 'large', isCollapsed: boolean) => {
   const multipliers = { small: 1.5, medium: 1, large: 0.7 };
   const multiplier = multipliers[size];
+  
+  // Add extra columns when sidebar is collapsed (more space available)
+  const extraColumns = isCollapsed ? 1 : 0;
 
   return {
-    default: Math.round(6 * multiplier),
-    1600: Math.round(5 * multiplier),
-    1280: Math.round(4 * multiplier),
-    1024: Math.round(3 * multiplier),
-    768: Math.round(2 * multiplier),
+    default: Math.round(6 * multiplier) + extraColumns,
+    1600: Math.round(5 * multiplier) + extraColumns,
+    1280: Math.round(4 * multiplier) + extraColumns,
+    1024: Math.round(3 * multiplier) + extraColumns,
+    768: Math.round(2 * multiplier) + Math.min(extraColumns, 1), // Cap extra columns on smaller screens
     640: 1,
   };
 };
@@ -40,28 +47,33 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
   isSelecting = false,
   selectedImages = new Set(),
   onImageSelect,
-  imageSize = 'medium'
+  imageSize = 'medium',
+  isLoading = false,
+  expectedCount = 20
 }) => {
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const { isCollapsed } = useSidebar();
   
   // Get adaptive image size based on device capabilities
   const adaptiveSize = getAdaptiveImageSize();
   const effectiveSize = imageSize === 'medium' ? adaptiveSize : imageSize;
+
+  // Show skeleton placeholders when loading new content
+  // Show skeletons when loading AND no images (this ensures skeletons show during fresh loads)
+  const showSkeletons = isLoading && images.length === 0;
 
   // Preload gallery images when component mounts or images change
   useEffect(() => {
     if (images.length > 0) {
       // Preload thumbnails for gallery view
       const filenames = images.map(img => img.filename);
-      loadGalleryImages(filenames).catch(console.error);
+      loadGalleryImages(filenames);
       
-      // Preload next few images in original size for quick viewer access
-      const preloadCount = Math.min(5, images.length);
-      const preloadFilenames = filenames.slice(0, preloadCount);
-      preloadNextImages(preloadFilenames, 'original');
+      // Preload next batch for smoother scrolling
+      preloadNextImages(filenames, effectiveSize);
     }
-  }, [images]);
+  }, [images, effectiveSize]);
 
   const handleImageClick = (imageId: number, index: number) => {
     if (onImageClick) {
@@ -103,14 +115,40 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
 
     setSelectedImageIndex(newIndex);
   };
-  if (images.length === 0) {
+  if (images.length === 0 && !isLoading) {
     return <div className="text-center text-gray-400 py-8">No images found.</div>;
   }
 
+  // Show skeleton placeholders while loading
+  if (showSkeletons) {
+    const skeletonCount = expectedCount; // Use expected count for better layout stability
+    const skeletonItems = Array.from({ length: skeletonCount }, (_, index) => (
+      <div key={`skeleton-${index}`} className="break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md">
+        <SkeletonImage 
+          width={300} 
+          height={Math.floor(Math.random() * 200) + 200} // Random height for variety
+          className="rounded"
+        />
+      </div>
+    ));
+
+    return (
+      <div className="masonry-container">
+        <Masonry
+          breakpointCols={getBreakpointColumns(imageSize, isCollapsed)}
+          className="flex w-auto"
+          columnClassName="masonry-column"
+        >
+          {skeletonItems}
+        </Masonry>
+      </div>
+    );
+  }
+
   return (
-    <>
+    <div className="masonry-container">
       <Masonry
-        breakpointCols={getBreakpointColumns(imageSize)}
+        breakpointCols={getBreakpointColumns(imageSize, isCollapsed)}
         className="flex w-auto"
         columnClassName="masonry-column"
       >
@@ -141,10 +179,11 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
                   alt={img.filename}
                   size={effectiveSize}
                   priority="high"
-                  className={`w-full h-auto object-cover transition-opacity ${isSelected ? 'opacity-80' : ''
-                    }`}
+                  className={`transition-opacity ${isSelected ? 'opacity-80' : ''}`}
                   loading="lazy"
                   decoding="async"
+                  width={img.width}
+                  height={img.height}
                 />
               </div>
             );
@@ -166,9 +205,11 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
                 alt={img.filename}
                 size={effectiveSize}
                 priority="normal"
-                className="w-full h-auto object-cover"
+                className=""
                 loading="lazy"
                 decoding="async"
+                width={img.width}
+                height={img.height}
               />
             </div>
           ) : (
@@ -183,9 +224,11 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
                 alt={img.filename}
                 size={effectiveSize}
                 priority="normal"
-                className="w-full h-auto object-cover"
+                className=""
                 loading="lazy"
                 decoding="async"
+                width={img.width}
+                height={img.height}
               />
             </div>
           );
@@ -201,7 +244,7 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
           onNavigate={handleNavigate}
         />
       )}
-    </>
+    </div>
   );
 };
 

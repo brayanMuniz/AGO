@@ -11,6 +11,9 @@ interface IntelligentImageProps {
   onError?: () => void;
   loading?: 'lazy' | 'eager';
   decoding?: 'async' | 'sync' | 'auto';
+  width?: number;
+  height?: number;
+  aspectRatio?: number;
 }
 
 const IntelligentImage: React.FC<IntelligentImageProps> = ({
@@ -22,7 +25,10 @@ const IntelligentImage: React.FC<IntelligentImageProps> = ({
   onLoad,
   onError,
   loading = 'lazy',
-  decoding = 'async'
+  decoding = 'async',
+  width,
+  height,
+  aspectRatio
 }) => {
   const imgRef = useRef<HTMLImageElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -68,13 +74,22 @@ const IntelligentImage: React.FC<IntelligentImageProps> = ({
     onError?.();
   };
 
+  // Calculate container style for stable dimensions
+  const containerStyle: React.CSSProperties = {};
+  
+  if (aspectRatio) {
+    containerStyle.aspectRatio = aspectRatio.toString();
+  } else if (width && height) {
+    containerStyle.aspectRatio = (width / height).toString();
+  }
+
   return (
-    <div className="relative">
+    <div className="relative w-full" style={containerStyle}>
       <img
         ref={imgRef}
         src={getImageUrl(filename, size)}
         alt={alt}
-        className={`transition-opacity duration-300 ${
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
           isLoaded ? 'opacity-100' : 'opacity-0'
         } ${className}`}
         onLoad={handleLoad}
@@ -83,10 +98,10 @@ const IntelligentImage: React.FC<IntelligentImageProps> = ({
         decoding={decoding}
       />
       
-      {/* Loading placeholder */}
+      {/* Loading placeholder with stable dimensions */}
       {!isLoaded && !isError && (
         <div className="absolute inset-0 bg-gray-800 animate-pulse flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin opacity-60"></div>
         </div>
       )}
       
@@ -94,10 +109,10 @@ const IntelligentImage: React.FC<IntelligentImageProps> = ({
       {isError && (
         <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
           <div className="text-gray-400 text-center">
-            <svg className="w-8 h-8 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-6 h-6 mx-auto mb-1" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
             </svg>
-            <p className="text-xs">Failed to load</p>
+            <p className="text-xs opacity-75">Failed to load</p>
           </div>
         </div>
       )}

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
 import GalleryView from "../components/GalleryView";
 import Pagination from "../components/Pagination";
 import ImageControlsBar from "../components/ImageControlsBar";
+import { useSidebar } from "../contexts/SidebarContext";
 
 interface ImageItem {
   id: number;
@@ -23,6 +24,7 @@ const Home = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isCollapsed } = useSidebar();
   const [pagination, setPagination] = useState<PaginationData>({
     current_page: 1,
     total_pages: 1,
@@ -83,7 +85,7 @@ const Home = () => {
     return (
       <div className="min-h-screen bg-gray-900">
         <Sidebar />
-        <div className="lg:ml-64">
+        <div className={`transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-48'}`}>
           <MobileNav />
           <main className="flex-1 p-6">
             <div className="flex flex-col items-center justify-center min-h-96">
@@ -99,7 +101,7 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-gray-900">
       <Sidebar />
-      <div className="lg:ml-64">
+      <div className={`transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-48'}`}>
         <MobileNav />
         <main className="flex-1 p-6">
           {/* Controls Bar */}
@@ -136,6 +138,8 @@ const Home = () => {
           <GalleryView 
             images={images} 
             imageSize={imageSize}
+            isLoading={loading}
+            expectedCount={itemsPerPage}
           />
 
          

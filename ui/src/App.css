@@ -6,3 +6,23 @@
   gap: 0.125rem;
 }
 
+/* Stable masonry container to prevent layout shifts */
+.masonry-container {
+  min-height: 400px;
+  width: 100%;
+}
+
+/* Shimmer animation for skeleton loading */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+

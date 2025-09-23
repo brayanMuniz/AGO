@@ -5,6 +5,7 @@ import MobileNav from "../components/MobileNav";
 import GalleryView from "../components/GalleryView";
 import ImageControlsBar from "../components/ImageControlsBar";
 import Pagination from "../components/Pagination";
+import { useSidebar } from "../contexts/SidebarContext";
 
 interface BackendImageItem {
   id: number;
@@ -38,6 +39,7 @@ interface PaginationData {
 const AlbumDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [album, setAlbum] = useState<Album | null>(null);
+  const { isCollapsed } = useSidebar();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -611,7 +613,7 @@ const AlbumDetailPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 flex">
       <Sidebar />
-      <div className="lg:ml-64 flex-1 flex flex-col">
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-48'}`}>
         <MobileNav />
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
@@ -822,6 +824,8 @@ const AlbumDetailPage: React.FC = () => {
               isSelecting={isSelectingImages}
               selectedImages={selectedImages}
               onImageSelect={handleImageSelect}
+              isLoading={loading}
+              expectedCount={itemsPerPage}
             />
           </div>
           

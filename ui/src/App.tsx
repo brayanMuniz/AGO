@@ -16,35 +16,38 @@ import AllExplicitnessPage from "./pages/AllExplicitnessPage";
 import ExplicitnessPage from "./pages/ExplicitnessPage";
 
 import { Routes, Route } from "react-router-dom";
+import { SidebarProvider } from "./contexts/SidebarContext";
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-900">
-      <Routes>
-        <Route path="/" element={<Home />} />
+    <SidebarProvider>
+      <div className="min-h-screen bg-gray-900">
+        <Routes>
+          <Route path="/" element={<Home />} />
 
-        <Route path="/albums" element={<AlbumsPage />} />
-        <Route path="/albums/:id" element={<AlbumDetailPage />} />
+          <Route path="/albums" element={<AlbumsPage />} />
+          <Route path="/albums/:id" element={<AlbumDetailPage />} />
 
-        <Route path="/image/:id" element={<ImagePage />} />
+          <Route path="/image/:id" element={<ImagePage />} />
 
-        <Route path="/tags" element={<AllTagsPage />} />
-        <Route path="/tags/:tag" element={<TagPage />} />
+          <Route path="/tags" element={<AllTagsPage />} />
+          <Route path="/tags/:tag" element={<TagPage />} />
 
-        <Route path="/artists" element={<AllArtistsPage />} />
-        <Route path="/artists/:artist" element={<ArtistPage />} />
+          <Route path="/artists" element={<AllArtistsPage />} />
+          <Route path="/artists/:artist" element={<ArtistPage />} />
 
-        <Route path="/characters" element={<AllCharactersPage />} />
-        <Route path="/characters/:character" element={<CharacterPage />} />
+          <Route path="/characters" element={<AllCharactersPage />} />
+          <Route path="/characters/:character" element={<CharacterPage />} />
 
-        <Route path="/series" element={<AllSeriesPage />} />
-        <Route path="/series/:series" element={<SeriesPage />} />
+          <Route path="/series" element={<AllSeriesPage />} />
+          <Route path="/series/:series" element={<SeriesPage />} />
 
-        <Route path="/explicitness" element={<AllExplicitnessPage />} />
-        <Route path="/explicitness/:explicitness" element={<ExplicitnessPage />} />
+          <Route path="/explicitness" element={<AllExplicitnessPage />} />
+          <Route path="/explicitness/:explicitness" element={<ExplicitnessPage />} />
 
-      </Routes>
-    </div>
+        </Routes>
+      </div>
+    </SidebarProvider>
   );
 }
 

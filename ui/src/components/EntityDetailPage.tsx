@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import Sidebar from "../components/SideBar";
-import MobileNav from "../components/MobileNav";
-import GalleryView from "../components/GalleryView";
-import ImageControlsBar from "../components/ImageControlsBar";
-import Pagination from "../components/Pagination";
+import Sidebar from "./SideBar";
+import MobileNav from "./MobileNav";
+import GalleryView from "./GalleryView";
+import ImageControlsBar from "./ImageControlsBar";
+import Pagination from "./Pagination";
+import { useSidebar } from "../contexts/SidebarContext";
 
 interface BackendImageItem {
   id: number;
@@ -55,6 +56,7 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
 }) => {
   const params = useParams<{ [key: string]: string }>();
   const entityName = params[paramName];
+  const { isCollapsed } = useSidebar();
 
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,6 +189,10 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
     try {
       setLoading(true);
       setError(null);
+      // Clear images immediately to show skeletons
+      if (page === 1) {
+        setImages([]);
+      }
       
       const tagName = tagFormatter ? tagFormatter(entityName) : entityName;
       const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${page}&limit=${itemsPerPage}&sort=${sortBy}`;
@@ -263,15 +269,17 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   };
 
   useEffect(() => {
+    // Reset loading state when parameters change
+    setLoading(true);
     fetchImages(1);
     fetchTagInfo();
   }, [entityName, entityTypeSingular, sortBy, itemsPerPage]);
 
-  if (loading) {
+  if (loading && images.length === 0) {
     return (
       <div className="min-h-screen bg-gray-900">
         <Sidebar />
-        <div className="lg:ml-64">
+        <div className={`transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-48'}`}>
           <MobileNav />
           <main className="flex-1 p-6">
             <div className="flex flex-col items-center justify-center min-h-96">
@@ -288,7 +296,7 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
     return (
       <div className="min-h-screen bg-gray-900">
         <Sidebar />
-        <div className="lg:ml-64">
+        <div className={`transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-48'}`}>
           <MobileNav />
           <main className="flex-1 p-6">
             <div className="text-center text-red-400">{error}</div>
@@ -299,11 +307,11 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex">
+    <div className="min-h-screen bg-gray-900">
       <Sidebar />
-      <div className="lg:ml-64 flex-1 flex flex-col">
+      <div className={`transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-48'}`}>
         <MobileNav />
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-6">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold text-gray-100">{icon} {entityName}</h1>
@@ -452,6 +460,8 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
             isSelecting={isSelectingImages}
             selectedImages={selectedImages}
             onImageSelect={handleImageSelect}
+            isLoading={loading}
+            expectedCount={itemsPerPage}
           />
           {images.length === 0 && (
             <div className="text-center text-gray-400 py-10">No images found for this {entityTypeSingular.toLowerCase()}.</div>
