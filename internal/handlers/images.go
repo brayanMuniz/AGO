@@ -180,12 +180,60 @@ func ServeImageFileHandler() gin.HandlerFunc {
 			return
 		}
 		filename = filepath.Base(filename)
-		fullPath := filepath.Join("./gallery", filename)
-		if _, err := os.Stat(fullPath); err != nil {
-			ctx.JSON(404, gin.H{"error": "file not found"})
+		
+		// Check for size parameter
+		size := ctx.Query("size")
+		
+		// If no size specified or size is "original", serve original image
+		if size == "" || size == "original" {
+			fullPath := filepath.Join("./gallery", filename)
+			if _, err := os.Stat(fullPath); err != nil {
+				ctx.JSON(404, gin.H{"error": "file not found"})
+				return
+			}
+			
+			// Set caching headers for original images (cache for 24 hours)
+			ctx.Header("Cache-Control", "public, max-age=86400")
+			ctx.Header("ETag", fmt.Sprintf(`"%s_original"`, filename))
+			
+			ctx.File(fullPath)
 			return
 		}
-		ctx.File(fullPath)
+		
+		// Validate size parameter
+		validSizes := map[string]bool{
+			"small":  true,
+			"medium": true,
+			"large":  true,
+		}
+		
+		if !validSizes[size] {
+			ctx.JSON(400, gin.H{"error": "invalid size parameter. Valid sizes: small, medium, large, original"})
+			return
+		}
+		
+		// Check if original image exists
+		originalPath := filepath.Join("./gallery", filename)
+		if _, err := os.Stat(originalPath); err != nil {
+			ctx.JSON(404, gin.H{"error": "original file not found"})
+			return
+		}
+		
+		// Generate thumbnail if needed
+		thumbnailPath, err := images.GenerateThumbnailIfNeeded(originalPath, filename, size)
+		if err != nil {
+			// If thumbnail generation fails, fall back to original
+			fmt.Printf("Failed to generate thumbnail for %s (size: %s): %v\n", filename, size, err)
+			ctx.File(originalPath)
+			return
+		}
+		
+		// Set caching headers for thumbnails (cache for 1 hour)
+		ctx.Header("Cache-Control", "public, max-age=3600")
+		ctx.Header("ETag", fmt.Sprintf(`"%s_%s"`, filename, size))
+		
+		// Serve thumbnail
+		ctx.File(thumbnailPath)
 	}
 }
 

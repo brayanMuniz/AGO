@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Masonry from "react-masonry-css";
 import ImageViewer from "./ImageViewer";
+import IntelligentImage from "./IntelligentImage";
+import { loadGalleryImages, preloadNextImages, getAdaptiveImageSize } from "../utils/imageLoader";
 
 interface ImageItem {
   id: number;
@@ -42,6 +44,24 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
 }) => {
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  
+  // Get adaptive image size based on device capabilities
+  const adaptiveSize = getAdaptiveImageSize();
+  const effectiveSize = imageSize === 'medium' ? adaptiveSize : imageSize;
+
+  // Preload gallery images when component mounts or images change
+  useEffect(() => {
+    if (images.length > 0) {
+      // Preload thumbnails for gallery view
+      const filenames = images.map(img => img.filename);
+      loadGalleryImages(filenames).catch(console.error);
+      
+      // Preload next few images in original size for quick viewer access
+      const preloadCount = Math.min(5, images.length);
+      const preloadFilenames = filenames.slice(0, preloadCount);
+      preloadNextImages(preloadFilenames, 'original');
+    }
+  }, [images]);
 
   const handleImageClick = (imageId: number, index: number) => {
     if (onImageClick) {
@@ -116,9 +136,11 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
                     ✓
                   </div>
                 )}
-                <img
-                  src={`/api/images/file/${img.filename}`}
+                <IntelligentImage
+                  filename={img.filename}
                   alt={img.filename}
+                  size={effectiveSize}
+                  priority="high"
                   className={`w-full h-auto object-cover transition-opacity ${isSelected ? 'opacity-80' : ''
                     }`}
                   loading="lazy"
@@ -135,9 +157,11 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
               onMouseDown={(e) => handleImageMouseDown(e, img.id, index)}
               className="break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer hover:ring-2 hover:ring-pink-500"
             >
-              <img
-                src={`/api/images/file/${img.filename}`}
+              <IntelligentImage
+                filename={img.filename}
                 alt={img.filename}
+                size={effectiveSize}
+                priority="normal"
                 className="w-full h-auto object-cover"
                 loading="lazy"
                 decoding="async"
@@ -150,9 +174,11 @@ const ImageMasonry: React.FC<GalleryViewProps> = ({
               onMouseDown={(e) => handleImageMouseDown(e, img.id, index)}
               className="break-inside-avoid bg-gray-800 rounded overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer hover:ring-2 hover:ring-pink-500"
             >
-              <img
-                src={`/api/images/file/${img.filename}`}
+              <IntelligentImage
+                filename={img.filename}
                 alt={img.filename}
+                size={effectiveSize}
+                priority="normal"
                 className="w-full h-auto object-cover"
                 loading="lazy"
                 decoding="async"

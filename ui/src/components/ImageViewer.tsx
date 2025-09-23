@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SimpleImageControls from './SimpleImageControls';
+import { getImageUrl, preloadNextImages } from '../utils/imageLoader';
 
 interface ImageItem {
   id: number;
@@ -56,6 +57,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     };
     loadImageData();
   }, [currentImage]);
+
+  // Preload next 5 images for smooth navigation
+  useEffect(() => {
+    if (images.length > 0 && currentIndex >= 0) {
+      const nextImages: string[] = [];
+      
+      // Get next 5 images (or remaining images if less than 5)
+      for (let i = 1; i <= 5 && currentIndex + i < images.length; i++) {
+        nextImages.push(images[currentIndex + i].filename);
+      }
+      
+      // Also preload previous 2 images for backward navigation
+      for (let i = 1; i <= 2 && currentIndex - i >= 0; i++) {
+        nextImages.push(images[currentIndex - i].filename);
+      }
+      
+      if (nextImages.length > 0) {
+        preloadNextImages(nextImages, 'original');
+      }
+    }
+  }, [currentIndex, images]);
 
   // API helper functions
   const updateImageRating = async (newRating: number) => {
@@ -305,7 +327,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     >
       {/* Main Image - Better mobile styling */}
       <img
-        src={`/api/images/file/${currentImage.filename}`}
+        src={getImageUrl(currentImage.filename, 'original')}
         alt={currentImage.filename}
         className="max-w-full max-h-full object-contain"
         style={{
