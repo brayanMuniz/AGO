@@ -6,6 +6,7 @@ import GalleryView from "./GalleryView";
 import ImageControlsBar from "./ImageControlsBar";
 import Pagination from "./Pagination";
 import { useSidebar } from "../contexts/SidebarContext";
+import { useUrlParams } from "../hooks/useUrlParams";
 
 interface BackendImageItem {
   id: number;
@@ -76,11 +77,18 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
     limit: 20,
   });
   
-  // Controls state
-  const [sortBy, setSortBy] = useState("random");
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [imageSize, setImageSize] = useState<'small' | 'medium' | 'large'>('medium');
+  // URL parameters for controls
+  const { sortBy, perPage: itemsPerPage, imageSize, backendSortBy, setPerPage: setItemsPerPage, setImageSize, getBackendSortValue, handleBackendSortChange } = useUrlParams();
   const [isExporting, setIsExporting] = useState(false);
+
+  // Handler wrappers for type compatibility
+  const handleSortChange = (sort: string) => {
+    handleBackendSortChange(sort); // Handle backend parameter names from ImageControlsBar
+  };
+
+  const handleItemsPerPageChange = (limit: number) => {
+    setItemsPerPage(limit as any); // Type assertion, will be validated in hook
+  };
 
   const handleImageSelect = (imageId: number) => {
     if (!isSelectingImages) return;
@@ -195,7 +203,7 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       }
       
       const tagName = tagFormatter ? tagFormatter(entityName) : entityName;
-      const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${page}&limit=${itemsPerPage}&sort=${sortBy}`;
+      const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${page}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}`;
       const res = await fetch(url);
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -421,10 +429,10 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
           
           {/* Controls Bar */}
           <ImageControlsBar
-            sortBy={sortBy}
-            onSortChange={setSortBy}
+            sortBy={backendSortBy}
+            onSortChange={handleSortChange}
             itemsPerPage={itemsPerPage}
-            onItemsPerPageChange={setItemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
             imageSize={imageSize}
             onImageSizeChange={setImageSize}
             exportData={entityName ? {

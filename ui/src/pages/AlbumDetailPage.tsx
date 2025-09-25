@@ -6,6 +6,7 @@ import GalleryView from "../components/GalleryView";
 import ImageControlsBar from "../components/ImageControlsBar";
 import Pagination from "../components/Pagination";
 import { useSidebar } from "../contexts/SidebarContext";
+import { useUrlParams } from "../hooks/useUrlParams";
 
 interface BackendImageItem {
   id: number;
@@ -75,11 +76,18 @@ const AlbumDetailPage: React.FC = () => {
     limit: 20,
   });
   
-  // Controls state
-  const [sortBy, setSortBy] = useState("random");
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [imageSize, setImageSize] = useState<'small' | 'medium' | 'large'>('medium');
+  // URL parameters for controls
+  const { sortBy, perPage: itemsPerPage, imageSize, backendSortBy, setPerPage: setItemsPerPage, setImageSize, getBackendSortValue, handleBackendSortChange } = useUrlParams();
   const [isExporting, setIsExporting] = useState(false);
+
+  // Handler wrappers for type compatibility
+  const handleSortChange = (sort: string) => {
+    handleBackendSortChange(sort); // Handle backend parameter names from ImageControlsBar
+  };
+
+  const handleItemsPerPageChange = (limit: number) => {
+    setItemsPerPage(limit as any); // Type assertion, will be validated in hook
+  };
 
   useEffect(() => {
     const fetchAlbumData = async () => {
@@ -271,7 +279,7 @@ const AlbumDetailPage: React.FC = () => {
     
     try {
       setLoading(true);
-      const url = `/api/albums/${id}/images?page=${page}&limit=${itemsPerPage}&sort=${sortBy}`;
+      const url = `/api/albums/${id}/images?page=${page}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}`;
       const imagesResponse = await fetch(url);
       if (!imagesResponse.ok) {
         throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
@@ -788,10 +796,10 @@ const AlbumDetailPage: React.FC = () => {
           
           {/* Controls Bar */}
           <ImageControlsBar
-            sortBy={sortBy}
-            onSortChange={setSortBy}
+            sortBy={backendSortBy}
+            onSortChange={handleSortChange}
             itemsPerPage={itemsPerPage}
-            onItemsPerPageChange={setItemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
             imageSize={imageSize}
             onImageSizeChange={setImageSize}
             exportData={album ? {

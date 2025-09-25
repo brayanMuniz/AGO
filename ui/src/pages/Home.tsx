@@ -5,6 +5,7 @@ import GalleryView from "../components/GalleryView";
 import Pagination from "../components/Pagination";
 import ImageControlsBar from "../components/ImageControlsBar";
 import { useSidebar } from "../contexts/SidebarContext";
+import { useUrlParams } from "../hooks/useUrlParams";
 
 interface ImageItem {
   id: number;
@@ -32,10 +33,8 @@ const Home = () => {
     limit: 20,
   });
   
-  // Controls state
-  const [sortBy, setSortBy] = useState("random");
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [imageSize, setImageSize] = useState<'small' | 'medium' | 'large'>('medium');
+  // URL parameters for controls
+  const { sortBy, perPage: itemsPerPage, imageSize, backendSortBy, setPerPage: setItemsPerPage, setImageSize, getBackendSortValue, handleBackendSortChange } = useUrlParams();
 
   const fetchImages = async (page: number = 1) => {
     try {
@@ -43,7 +42,7 @@ const Home = () => {
       setError(null);
       
       const response = await fetch(
-        `/api/images?page=${page}&limit=${itemsPerPage}&sort=${sortBy}`
+        `/api/images?page=${page}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}`
       );
       
       if (!response.ok) {
@@ -70,11 +69,11 @@ const Home = () => {
   };
 
   const handleSortChange = (newSort: string) => {
-    setSortBy(newSort);
+    handleBackendSortChange(newSort); // Handle backend parameter names from ImageControlsBar
   };
 
   const handleItemsPerPageChange = (newLimit: number) => {
-    setItemsPerPage(newLimit);
+    setItemsPerPage(newLimit as any); // Type assertion for now, will be validated in hook
   };
 
   const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
@@ -106,7 +105,7 @@ const Home = () => {
         <main className="flex-1 p-6">
           {/* Controls Bar */}
           <ImageControlsBar
-            sortBy={sortBy}
+            sortBy={backendSortBy}
             onSortChange={handleSortChange}
             itemsPerPage={itemsPerPage}
             onItemsPerPageChange={handleItemsPerPageChange}
