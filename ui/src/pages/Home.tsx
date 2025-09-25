@@ -34,15 +34,16 @@ const Home = () => {
   });
   
   // URL parameters for controls
-  const { sortBy, perPage: itemsPerPage, imageSize, backendSortBy, setPerPage: setItemsPerPage, setImageSize, getBackendSortValue, handleBackendSortChange } = useUrlParams();
+  const { sortBy, perPage: itemsPerPage, imageSize, page, seed, backendSortBy, setPerPage: setItemsPerPage, setImageSize, setPage, getBackendSortValue, handleBackendSortChange } = useUrlParams();
 
-  const fetchImages = async (page: number = 1) => {
+  const fetchImages = async (pageNum: number = page) => {
     try {
       setLoading(true);
       setError(null);
       
+      const seedParam = seed ? `&seed=${seed}` : '';
       const response = await fetch(
-        `/api/images?page=${page}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}`
+        `/api/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}`
       );
       
       if (!response.ok) {
@@ -61,11 +62,11 @@ const Home = () => {
   };
 
   useEffect(() => {
-    fetchImages(1);
-  }, [sortBy, itemsPerPage]);
-
-  const handlePageChange = (page: number) => {
     fetchImages(page);
+  }, [sortBy, itemsPerPage, page]);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
   };
 
   const handleSortChange = (newSort: string) => {
@@ -123,7 +124,7 @@ const Home = () => {
 
   {/* Pagination */}
           <Pagination
-            currentPage={pagination.current_page}
+            currentPage={page}
             totalPages={pagination.total_pages}
             onPageChange={handlePageChange}
           />

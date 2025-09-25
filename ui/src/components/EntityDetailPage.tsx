@@ -78,7 +78,7 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   });
   
   // URL parameters for controls
-  const { sortBy, perPage: itemsPerPage, imageSize, backendSortBy, setPerPage: setItemsPerPage, setImageSize, getBackendSortValue, handleBackendSortChange } = useUrlParams();
+  const { sortBy, perPage: itemsPerPage, imageSize, page, seed, backendSortBy, setPerPage: setItemsPerPage, setImageSize, setPage, getBackendSortValue, handleBackendSortChange } = useUrlParams();
   const [isExporting, setIsExporting] = useState(false);
 
   // Handler wrappers for type compatibility
@@ -188,22 +188,21 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
     }
   };
 
-  const fetchImages = async (page: number = 1) => {
+  const fetchImages = async (pageNum: number = page) => {
     if (!entityName) {
-      setError(`No ${entityTypeSingular.toLowerCase()} provided`);
-      setLoading(false);
       return;
     }
     try {
       setLoading(true);
       setError(null);
       // Clear images immediately to show skeletons
-      if (page === 1) {
+      if (pageNum === 1) {
         setImages([]);
       }
       
       const tagName = tagFormatter ? tagFormatter(entityName) : entityName;
-      const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${page}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}`;
+      const seedParam = seed ? `&seed=${seed}` : '';
+      const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}`;
       const res = await fetch(url);
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -279,9 +278,9 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   useEffect(() => {
     // Reset loading state when parameters change
     setLoading(true);
-    fetchImages(1);
+    fetchImages(page);
     fetchTagInfo();
-  }, [entityName, entityTypeSingular, sortBy, itemsPerPage]);
+  }, [entityName, entityTypeSingular, sortBy, itemsPerPage, page]);
 
   if (loading && images.length === 0) {
     return (
@@ -452,9 +451,9 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
 
           {/* Pagination */}
           <Pagination
-            currentPage={pagination.current_page}
+            currentPage={page}
             totalPages={pagination.total_pages}
-            onPageChange={fetchImages}
+            onPageChange={setPage}
           />
 
           {/* Results Info */}

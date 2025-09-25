@@ -174,7 +174,7 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string) ([]ImageResult, int, error) {
+func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string) ([]ImageResult, int, error) {
 	if len(tags) == 0 {
 		return nil, 0, fmt.Errorf("no tags provided")
 	}
@@ -197,7 +197,12 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 	case "likes_asc":
 		orderBy = "ORDER BY images.like_count ASC, images.id ASC"
 	case "random":
-		orderBy = "ORDER BY RANDOM()"
+		if seed != "" {
+			// Use seeded random for reproducible results
+			orderBy = fmt.Sprintf("ORDER BY (images.id * %s) %% 1000000", seed)
+		} else {
+			orderBy = "ORDER BY RANDOM()"
+		}
 	default:
 		orderBy = "ORDER BY RANDOM()"
 	}

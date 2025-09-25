@@ -77,7 +77,7 @@ const AlbumDetailPage: React.FC = () => {
   });
   
   // URL parameters for controls
-  const { sortBy, perPage: itemsPerPage, imageSize, backendSortBy, setPerPage: setItemsPerPage, setImageSize, getBackendSortValue, handleBackendSortChange } = useUrlParams();
+  const { sortBy, perPage: itemsPerPage, imageSize, page, seed, backendSortBy, setPerPage: setItemsPerPage, setImageSize, setPage, getBackendSortValue, handleBackendSortChange } = useUrlParams();
   const [isExporting, setIsExporting] = useState(false);
 
   // Handler wrappers for type compatibility
@@ -129,9 +129,9 @@ const AlbumDetailPage: React.FC = () => {
   // Refetch images when controls change
   useEffect(() => {
     if (id) {
-      fetchImages(1);
+      fetchImages(page);
     }
-  }, [sortBy, itemsPerPage]);
+  }, [sortBy, itemsPerPage, page]);
 
   const handleImageSelect = (imageId: number) => {
     if (!isSelectingImages) return;
@@ -274,12 +274,13 @@ const AlbumDetailPage: React.FC = () => {
     }
   };
 
-  const fetchImages = async (page: number = 1) => {
+  const fetchImages = async (pageNum: number = page) => {
     if (!id) return;
     
     try {
       setLoading(true);
-      const url = `/api/albums/${id}/images?page=${page}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}`;
+      const seedParam = seed ? `&seed=${seed}` : '';
+      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}`;
       const imagesResponse = await fetch(url);
       if (!imagesResponse.ok) {
         throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
@@ -819,9 +820,9 @@ const AlbumDetailPage: React.FC = () => {
 
           {/* Pagination */}
           <Pagination
-            currentPage={pagination.current_page}
+            currentPage={page}
             totalPages={pagination.total_pages}
-            onPageChange={fetchImages}
+            onPageChange={setPage}
           />
           
           <div className={isSettingCover ? "cursor-pointer" : ""}>

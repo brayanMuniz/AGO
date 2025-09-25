@@ -9,12 +9,15 @@ export interface UrlParams {
   sortBy: SortBy;
   perPage: PerPage;
   imageSize: ImageSize;
+  page: number; // Current page number
+  seed?: number; // Optional seed for random sorting
 }
 
 const DEFAULT_PARAMS: UrlParams = {
   sortBy: 'newest',
   perPage: 20,
-  imageSize: 'medium'
+  imageSize: 'medium',
+  page: 1
 };
 
 // Map user-friendly sort names to backend parameter names
@@ -47,6 +50,8 @@ export const useUrlParams = () => {
     const sortBy = (searchParams.get('sort_by') as SortBy) || DEFAULT_PARAMS.sortBy;
     const perPage = parseInt(searchParams.get('per_page') || '20') as PerPage;
     const imageSize = (searchParams.get('image_size') as ImageSize) || DEFAULT_PARAMS.imageSize;
+    const page = parseInt(searchParams.get('page') || '1');
+    const seed = searchParams.get('seed') ? parseInt(searchParams.get('seed')!) : undefined;
 
     // Validate parameters - handle both user-friendly and backend parameter names
     let validSortBy: SortBy;
@@ -64,11 +69,14 @@ export const useUrlParams = () => {
       ? perPage : DEFAULT_PARAMS.perPage;
     const validImageSize = ['small', 'medium', 'large'].includes(imageSize) 
       ? imageSize : DEFAULT_PARAMS.imageSize;
+    const validPage = page >= 1 ? page : DEFAULT_PARAMS.page;
 
     return {
       sortBy: validSortBy,
       perPage: validPerPage,
-      imageSize: validImageSize
+      imageSize: validImageSize,
+      page: validPage,
+      seed
     };
   }, [searchParams]);
 
@@ -94,13 +102,26 @@ export const useUrlParams = () => {
     if (updatedParams.imageSize !== DEFAULT_PARAMS.imageSize) {
       newSearchParams.set('image_size', updatedParams.imageSize);
     }
+    if (updatedParams.page !== DEFAULT_PARAMS.page) {
+      newSearchParams.set('page', updatedParams.page.toString());
+    }
+    if (updatedParams.seed !== undefined) {
+      newSearchParams.set('seed', updatedParams.seed.toString());
+    }
 
     setSearchParams(newSearchParams, { replace: true });
   }, [getCurrentParams, setSearchParams]);
 
   // Individual parameter updaters
   const setSortBy = useCallback((sortBy: SortBy) => {
-    updateParams({ sortBy });
+    const params: Partial<UrlParams> = { sortBy };
+    
+    // Generate new seed when switching to random sorting
+    if (sortBy === 'random') {
+      params.seed = Math.floor(Math.random() * 1000000);
+    }
+    
+    updateParams(params);
   }, [updateParams]);
 
   const setPerPage = useCallback((perPage: PerPage) => {
@@ -109,6 +130,10 @@ export const useUrlParams = () => {
 
   const setImageSize = useCallback((imageSize: ImageSize) => {
     updateParams({ imageSize });
+  }, [updateParams]);
+
+  const setPage = useCallback((page: number) => {
+    updateParams({ page });
   }, [updateParams]);
 
   // Handle backend parameter changes from ImageControlsBar
@@ -127,6 +152,8 @@ export const useUrlParams = () => {
     sortBy: params.sortBy,
     perPage: params.perPage,
     imageSize: params.imageSize,
+    page: params.page,
+    seed: params.seed,
     
     // Backend values for components that expect them
     backendSortBy: getBackendSortValue(params.sortBy),
@@ -135,6 +162,7 @@ export const useUrlParams = () => {
     setSortBy,
     setPerPage,
     setImageSize,
+    setPage,
     updateParams,
     handleBackendSortChange,
     

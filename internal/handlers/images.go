@@ -22,6 +22,7 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 		sortBy := c.DefaultQuery("sort", "random")
+		seed := c.DefaultQuery("seed", "")
 
 		if page < 1 {
 			page = 1
@@ -48,7 +49,12 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		case "likes_asc":
 			orderBy = "ORDER BY like_count ASC, id ASC"
 		case "random":
-			orderBy = "ORDER BY RANDOM()"
+			if seed != "" {
+				// Use seeded random for reproducible results
+				orderBy = fmt.Sprintf("ORDER BY (id * %s) %% 1000000", seed)
+			} else {
+				orderBy = "ORDER BY RANDOM()"
+			}
 		default:
 			orderBy = "ORDER BY RANDOM()"
 		}
@@ -138,6 +144,7 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 		limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "20"))
 		sortBy := ctx.DefaultQuery("sort", "random")
+		seed := ctx.DefaultQuery("seed", "")
 
 		if page < 1 {
 			page = 1
@@ -152,7 +159,7 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Get paginated results
-		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy)
+		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy, seed)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": err.Error()})
 			return

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"github.com/brayanMuniz/AGO/database"
 	"github.com/gin-gonic/gin"
@@ -51,6 +52,7 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 		sortBy := c.DefaultQuery("sort", "random")
+		seed := c.DefaultQuery("seed", "")
 
 		if page < 1 {
 			page = 1
@@ -87,7 +89,12 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		case "likes_asc":
 			orderBy = "ORDER BY images.like_count ASC, images.id ASC"
 		case "random":
-			orderBy = "ORDER BY RANDOM()"
+			if seed != "" {
+				// Use seeded random for reproducible results
+				orderBy = fmt.Sprintf("ORDER BY (images.id * %s) %% 1000000", seed)
+			} else {
+				orderBy = "ORDER BY RANDOM()"
+			}
 		default:
 			orderBy = "ORDER BY RANDOM()"
 		}
