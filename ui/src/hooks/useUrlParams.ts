@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 
 export type SortBy = 'newest' | 'oldest' | 'random' | 'most_liked' | 'least_liked' | 'highest_rated' | 'lowest_rated';
 export type ImageSize = 'small' | 'medium' | 'large';
-export type PerPage = 20 | 40 | 60 | 100;
+export type PerPage = 20 | 40 | 60 | 100 | 1000;
 
 export interface UrlParams {
   sortBy: SortBy;
@@ -65,7 +65,7 @@ export const useUrlParams = () => {
       // Invalid - use default
       validSortBy = DEFAULT_PARAMS.sortBy;
     }
-    const validPerPage = [20, 40, 60, 100].includes(perPage) 
+    const validPerPage = [20, 40, 60, 100, 1000].includes(perPage) 
       ? perPage : DEFAULT_PARAMS.perPage;
     const validImageSize = ['small', 'medium', 'large'].includes(imageSize) 
       ? imageSize : DEFAULT_PARAMS.imageSize;

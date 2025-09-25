@@ -27,7 +27,7 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		if page < 1 {
 			page = 1
 		}
-		if limit < 1 || limit > 100 {
+		if limit < 1 || limit > 1000 {
 			limit = 20
 		}
 
@@ -149,7 +149,7 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		if page < 1 {
 			page = 1
 		}
-		if limit < 1 || limit > 100 {
+		if limit < 1 || limit > 1000 {
 			limit = 20
 		}
 
