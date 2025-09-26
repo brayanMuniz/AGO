@@ -13,6 +13,8 @@ export interface UrlParams {
   seed?: number; // Optional seed for random sorting
   includeCharacters?: string[]; // Character names to include
   excludeCharacters?: string[]; // Character names to exclude
+  includeTags?: string[]; // Tag names to include
+  excludeTags?: string[]; // Tag names to exclude
 }
 
 const DEFAULT_PARAMS: UrlParams = {
@@ -58,6 +60,10 @@ export const useUrlParams = () => {
     // Parse character filters
     const includeCharacters = searchParams.get('include_characters')?.split(',').filter(Boolean) || undefined;
     const excludeCharacters = searchParams.get('exclude_characters')?.split(',').filter(Boolean) || undefined;
+    
+    // Parse tag filters
+    const includeTags = searchParams.get('include_tags')?.split(',').filter(Boolean) || undefined;
+    const excludeTags = searchParams.get('exclude_tags')?.split(',').filter(Boolean) || undefined;
 
     // Validate parameters - handle both user-friendly and backend parameter names
     let validSortBy: SortBy;
@@ -84,7 +90,9 @@ export const useUrlParams = () => {
       page: validPage,
       seed,
       includeCharacters,
-      excludeCharacters
+      excludeCharacters,
+      includeTags,
+      excludeTags
     };
   }, [searchParams]);
 
@@ -126,6 +134,16 @@ export const useUrlParams = () => {
     } else if (updatedParams.excludeCharacters !== undefined) {
       newSearchParams.delete('exclude_characters');
     }
+    if (updatedParams.includeTags && updatedParams.includeTags.length > 0) {
+      newSearchParams.set('include_tags', updatedParams.includeTags.join(','));
+    } else if (updatedParams.includeTags !== undefined) {
+      newSearchParams.delete('include_tags');
+    }
+    if (updatedParams.excludeTags && updatedParams.excludeTags.length > 0) {
+      newSearchParams.set('exclude_tags', updatedParams.excludeTags.join(','));
+    } else if (updatedParams.excludeTags !== undefined) {
+      newSearchParams.delete('exclude_tags');
+    }
 
     setSearchParams(newSearchParams, { replace: true });
   }, [getCurrentParams, setSearchParams]);
@@ -158,6 +176,10 @@ export const useUrlParams = () => {
     updateParams({ includeCharacters, excludeCharacters });
   }, [updateParams]);
 
+  const setTagFilters = useCallback((includeTags?: string[], excludeTags?: string[]) => {
+    updateParams({ includeTags, excludeTags });
+  }, [updateParams]);
+
   // Handle backend parameter changes from ImageControlsBar
   const handleBackendSortChange = useCallback((backendSort: string) => {
     const userFriendlySort = REVERSE_SORT_MAP[backendSort];
@@ -178,6 +200,8 @@ export const useUrlParams = () => {
     seed: params.seed,
     includeCharacters: params.includeCharacters,
     excludeCharacters: params.excludeCharacters,
+    includeTags: params.includeTags,
+    excludeTags: params.excludeTags,
     
     // Backend values for components that expect them
     backendSortBy: getBackendSortValue(params.sortBy),
@@ -188,6 +212,7 @@ export const useUrlParams = () => {
     setImageSize,
     setPage,
     setCharacterFilters,
+    setTagFilters,
     updateParams,
     handleBackendSortChange,
     

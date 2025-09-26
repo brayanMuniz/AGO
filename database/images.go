@@ -174,7 +174,7 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string, includeCharacters, excludeCharacters []string) ([]ImageResult, int, error) {
+func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string, includeCharacters, excludeCharacters, includeTags, excludeTags []string) ([]ImageResult, int, error) {
 	if len(tags) == 0 {
 		return nil, 0, fmt.Errorf("no tags provided")
 	}
@@ -242,9 +242,54 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		}
 	}
 
-	characterWhereClause := ""
+	// Build tag filter conditions
+	var tagConditions []string
+	var tagArgs []any
+
+	if len(includeTags) > 0 {
+		includePlaceholders := strings.TrimRight(strings.Repeat("?,", len(includeTags)), ",")
+		tagConditions = append(tagConditions, fmt.Sprintf(`
+			images.id IN (
+				SELECT DISTINCT it.image_id 
+				FROM image_tags it 
+				JOIN tags t ON it.tag_id = t.id 
+				WHERE t.name IN (%s) AND t.category = 'general'
+			)`, includePlaceholders))
+		for _, tag := range includeTags {
+			tagArgs = append(tagArgs, tag)
+		}
+	}
+
+	if len(excludeTags) > 0 {
+		excludePlaceholders := strings.TrimRight(strings.Repeat("?,", len(excludeTags)), ",")
+		tagConditions = append(tagConditions, fmt.Sprintf(`
+			images.id NOT IN (
+				SELECT DISTINCT it.image_id 
+				FROM image_tags it 
+				JOIN tags t ON it.tag_id = t.id 
+				WHERE t.name IN (%s) AND t.category = 'general'
+			)`, excludePlaceholders))
+		for _, tag := range excludeTags {
+			tagArgs = append(tagArgs, tag)
+		}
+	}
+
+	// Combine all filter conditions
+	var allConditions []string
+	var allFilterArgs []any
+	
 	if len(characterConditions) > 0 {
-		characterWhereClause = " AND " + strings.Join(characterConditions, " AND ")
+		allConditions = append(allConditions, characterConditions...)
+		allFilterArgs = append(allFilterArgs, characterArgs...)
+	}
+	if len(tagConditions) > 0 {
+		allConditions = append(allConditions, tagConditions...)
+		allFilterArgs = append(allFilterArgs, tagArgs...)
+	}
+
+	filterWhereClause := ""
+	if len(allConditions) > 0 {
+		filterWhereClause = " AND " + strings.Join(allConditions, " AND ")
 	}
 
 	// Get total count first
@@ -256,16 +301,16 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		WHERE tags.name IN (%s) %s
 		GROUP BY images.id
 		HAVING COUNT(DISTINCT tags.name) = ?
-	`, placeholders, characterWhereClause)
+	`, placeholders, filterWhereClause)
 
-	args := make([]any, len(tags)+len(characterArgs)+1)
+	args := make([]any, len(tags)+len(allFilterArgs)+1)
 	for i, tag := range tags {
 		args[i] = tag
 	}
-	for i, charArg := range characterArgs {
-		args[len(tags)+i] = charArg
+	for i, filterArg := range allFilterArgs {
+		args[len(tags)+i] = filterArg
 	}
-	args[len(tags)+len(characterArgs)] = len(tags)
+	args[len(tags)+len(allFilterArgs)] = len(tags)
 
 	// Count total matching images
 	var totalCount int
@@ -298,18 +343,18 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		HAVING COUNT(DISTINCT tags.name) = ?
 		%s
 		LIMIT ? OFFSET ?
-	`, placeholders, characterWhereClause, orderBy)
+	`, placeholders, filterWhereClause, orderBy)
 
-	paginatedArgs := make([]any, len(tags)+len(characterArgs)+3)
+	paginatedArgs := make([]any, len(tags)+len(allFilterArgs)+3)
 	for i, tag := range tags {
 		paginatedArgs[i] = tag
 	}
-	for i, charArg := range characterArgs {
-		paginatedArgs[len(tags)+i] = charArg
+	for i, filterArg := range allFilterArgs {
+		paginatedArgs[len(tags)+i] = filterArg
 	}
-	paginatedArgs[len(tags)+len(characterArgs)] = len(tags)
-	paginatedArgs[len(tags)+len(characterArgs)+1] = limit
-	paginatedArgs[len(tags)+len(characterArgs)+2] = offset
+	paginatedArgs[len(tags)+len(allFilterArgs)] = len(tags)
+	paginatedArgs[len(tags)+len(allFilterArgs)+1] = limit
+	paginatedArgs[len(tags)+len(allFilterArgs)+2] = offset
 
 	rows, err := db.Query(query, paginatedArgs...)
 	if err != nil {

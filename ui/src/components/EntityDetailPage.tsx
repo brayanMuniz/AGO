@@ -55,13 +55,17 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       seed?: string;
       includeCharacters?: string;
       excludeCharacters?: string;
+      includeTags?: string;
+      excludeTags?: string;
     }) => {
       const seedParam = params.seed ? `&seed=${params.seed}` : '';
       const includeCharactersParam = params.includeCharacters ? `&include_characters=${params.includeCharacters}` : '';
       const excludeCharactersParam = params.excludeCharacters ? `&exclude_characters=${params.excludeCharacters}` : '';
+      const includeTagsParam = params.includeTags ? `&include_tags=${params.includeTags}` : '';
+      const excludeTagsParam = params.excludeTags ? `&exclude_tags=${params.excludeTags}` : '';
       
       const tagName = getTagName(entityName || '', entityTypeSingular);
-      return `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${params.page}&limit=${params.limit}&sort=${params.sort}${seedParam}${includeCharactersParam}${excludeCharactersParam}`;
+      return `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${params.page}&limit=${params.limit}&sort=${params.sort}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}`;
     },
     initialLoading: true,
   };

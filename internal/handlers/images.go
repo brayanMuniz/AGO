@@ -25,6 +25,8 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		seed := c.DefaultQuery("seed", "")
 		includeCharacters := c.DefaultQuery("include_characters", "")
 		excludeCharacters := c.DefaultQuery("exclude_characters", "")
+		includeTags := c.DefaultQuery("include_tags", "")
+		excludeTags := c.DefaultQuery("exclude_tags", "")
 
 		if page < 1 {
 			page = 1
@@ -61,12 +63,12 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 			orderBy = "ORDER BY RANDOM()"
 		}
 
-		// Build WHERE clause for character filtering
+		// Build WHERE clause for character and tag filtering
 		var whereClause string
 		var queryArgs []interface{}
 		var countArgs []interface{}
 
-		if includeCharacters != "" || excludeCharacters != "" {
+		if includeCharacters != "" || excludeCharacters != "" || includeTags != "" || excludeTags != "" {
 			var conditions []string
 			
 			if includeCharacters != "" {
@@ -102,6 +104,42 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 						FROM image_tags it 
 						JOIN tags t ON it.tag_id = t.id 
 						WHERE t.name IN (%s) AND t.category = 'character'
+					)`, strings.Join(placeholders, ",")))
+			}
+			
+			if includeTags != "" {
+				// Images must have at least one of the included tags (general category)
+				tags := strings.Split(includeTags, ",")
+				placeholders := make([]string, len(tags))
+				for i, tag := range tags {
+					placeholders[i] = "?"
+					queryArgs = append(queryArgs, strings.TrimSpace(tag))
+					countArgs = append(countArgs, strings.TrimSpace(tag))
+				}
+				conditions = append(conditions, fmt.Sprintf(`
+					images.id IN (
+						SELECT DISTINCT it.image_id 
+						FROM image_tags it 
+						JOIN tags t ON it.tag_id = t.id 
+						WHERE t.name IN (%s) AND t.category = 'general'
+					)`, strings.Join(placeholders, ",")))
+			}
+			
+			if excludeTags != "" {
+				// Images must NOT have any of the excluded tags (general category)
+				tags := strings.Split(excludeTags, ",")
+				placeholders := make([]string, len(tags))
+				for i, tag := range tags {
+					placeholders[i] = "?"
+					queryArgs = append(queryArgs, strings.TrimSpace(tag))
+					countArgs = append(countArgs, strings.TrimSpace(tag))
+				}
+				conditions = append(conditions, fmt.Sprintf(`
+					images.id NOT IN (
+						SELECT DISTINCT it.image_id 
+						FROM image_tags it 
+						JOIN tags t ON it.tag_id = t.id 
+						WHERE t.name IN (%s) AND t.category = 'general'
 					)`, strings.Join(placeholders, ",")))
 			}
 			
@@ -199,6 +237,8 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		seed := ctx.DefaultQuery("seed", "")
 		includeCharacters := ctx.DefaultQuery("include_characters", "")
 		excludeCharacters := ctx.DefaultQuery("exclude_characters", "")
+		includeTags := ctx.DefaultQuery("include_tags", "")
+		excludeTags := ctx.DefaultQuery("exclude_tags", "")
 
 		if page < 1 {
 			page = 1
@@ -227,8 +267,23 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 			}
 		}
 
+		// Parse tag filters
+		var includeTagsList, excludeTagsList []string
+		if includeTags != "" {
+			includeTagsList = strings.Split(includeTags, ",")
+			for i := range includeTagsList {
+				includeTagsList[i] = strings.TrimSpace(includeTagsList[i])
+			}
+		}
+		if excludeTags != "" {
+			excludeTagsList = strings.Split(excludeTags, ",")
+			for i := range excludeTagsList {
+				excludeTagsList[i] = strings.TrimSpace(excludeTagsList[i])
+			}
+		}
+
 		// Get paginated results
-		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy, seed, includeCharactersList, excludeCharactersList)
+		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy, seed, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": err.Error()})
 			return

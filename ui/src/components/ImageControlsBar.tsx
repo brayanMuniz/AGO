@@ -12,6 +12,12 @@ interface CharacterFilter {
   type: 'include' | 'exclude';
 }
 
+interface TagFilter {
+  id: number;
+  name: string;
+  type: 'include' | 'exclude';
+}
+
 interface ImageControlsBarProps {
   // Sorting controls
   sortBy: string;
@@ -28,6 +34,8 @@ interface ImageControlsBarProps {
   // Filter controls
   characterFilters?: CharacterFilter[];
   onCharacterFiltersChange?: (filters: CharacterFilter[]) => void;
+  tagFilters?: TagFilter[];
+  onTagFiltersChange?: (filters: TagFilter[]) => void;
   
   // Export controls
   exportData?: ExportData;
@@ -50,6 +58,8 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   onImageSizeChange,
   characterFilters = [],
   onCharacterFiltersChange,
+  tagFilters = [],
+  onTagFiltersChange,
   exportData,
   onExport,
   showSortControls = true,
@@ -64,6 +74,10 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   const [characterSearch, setCharacterSearch] = useState("");
   const [availableCharacters, setAvailableCharacters] = useState<any[]>([]);
   const [loadingCharacters, setLoadingCharacters] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
+  const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
 
   useEffect(() => {
     if (showCharacterModal) {
@@ -90,6 +104,32 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
       fetchCharacters();
     }
   }, [showCharacterModal]);
+
+  useEffect(() => {
+    if (showTagModal) {
+      const fetchTags = async () => {
+        try {
+          setLoadingTags(true);
+          const response = await fetch('/api/categories/tags');
+          if (response.ok) {
+            const data = await response.json();
+            // The API returns { tags: [...] } not a direct array
+            const tagsArray = Array.isArray(data.tags) ? data.tags : [];
+            setAvailableTags(tagsArray);
+          } else {
+            console.error('Failed to fetch tags, status:', response.status);
+            setAvailableTags([]);
+          }
+        } catch (error) {
+          console.error('Failed to fetch tags:', error);
+          setAvailableTags([]);
+        } finally {
+          setLoadingTags(false);
+        }
+      };
+      fetchTags();
+    }
+  }, [showTagModal]);
 
   return (
     <div className="flex flex-wrap items-center gap-3 mb-6 p-3 bg-gray-800 rounded-lg">
@@ -169,6 +209,15 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
                 className="w-full text-left px-3 py-2 text-white text-sm hover:bg-gray-600"
               >
                 Character
+              </button>
+              <button
+                onClick={() => {
+                  setShowTagModal(true);
+                  setShowFilterDropdown(false);
+                }}
+                className="w-full text-left px-3 py-2 text-white text-sm hover:bg-gray-600"
+              >
+                Tags
               </button>
             </div>
           )}
@@ -381,6 +430,158 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
             <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-700">
               <button
                 onClick={() => setShowCharacterModal(false)}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tag Filter Modal */}
+      {showTagModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 h-[500px] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Tag Filter</h2>
+              <button
+                onClick={() => setShowTagModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Current Filters */}
+            {tagFilters.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-white text-sm font-medium mb-2">Current Filters:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {tagFilters.map((filter, index) => (
+                    <span
+                      key={index}
+                      className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${
+                        filter.type === 'include' 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-orange-600 text-white'
+                      }`}
+                    >
+                      {filter.type === 'include' ? 'Include' : 'Exclude'}: {filter.name}
+                      <button
+                        onClick={() => {
+                          const newFilters = tagFilters.filter((_, i) => i !== index);
+                          onTagFiltersChange?.(newFilters);
+                        }}
+                        className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Search Input */}
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search tags..."
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                autoFocus
+              />
+            </div>
+
+            {/* Fixed height content area */}
+            <div className="flex-1 overflow-hidden">
+              {loadingTags && (
+                <div className="text-center text-gray-400 py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-500 mx-auto"></div>
+                  <p className="mt-2">Loading tags...</p>
+                </div>
+              )}
+
+              {!loadingTags && Array.isArray(availableTags) && availableTags.length > 0 && (
+                <div className="h-full flex flex-col">
+                  <h3 className="text-sm font-semibold text-gray-300 mb-2">Tags ({availableTags.length} total):</h3>
+                  <div className="flex-1 overflow-y-auto space-y-1">
+                    {availableTags
+                      .filter(tag => 
+                        !tagSearch || tag.name.toLowerCase().includes(tagSearch.toLowerCase())
+                      )
+                      .slice(0, 50)
+                      .map((tag) => (
+                        <div key={tag.id} className="flex items-center justify-between p-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm">
+                          <span>{tag.name}</span>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                const newFilter: TagFilter = {
+                                  id: tag.id,
+                                  name: tag.name,
+                                  type: 'include'
+                                };
+                                const newFilters = [...tagFilters.filter(f => f.id !== tag.id), newFilter];
+                                onTagFiltersChange?.(newFilters);
+                                setTagSearch("");
+                              }}
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+                            >
+                              Include
+                            </button>
+                            <button
+                              onClick={() => {
+                                const newFilter: TagFilter = {
+                                  id: tag.id,
+                                  name: tag.name,
+                                  type: 'exclude'
+                                };
+                                const newFilters = [...tagFilters.filter(f => f.id !== tag.id), newFilter];
+                                onTagFiltersChange?.(newFilters);
+                                setTagSearch("");
+                              }}
+                              className="px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded"
+                            >
+                              Exclude
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {!loadingTags && availableTags.length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <p>No tags available</p>
+                  <p className="text-sm mt-1">Check console for errors</p>
+                  <p className="text-xs mt-1 text-blue-400">Debug: {JSON.stringify({
+                    loading: loadingTags,
+                    count: availableTags.length,
+                    isArray: Array.isArray(availableTags),
+                    firstTag: availableTags[0]?.name || 'none',
+                    timestamp: Date.now()
+                  })}</p>
+                  <button 
+                    onClick={() => {
+                      console.log('Force refresh - current state:', availableTags);
+                      setAvailableTags([...availableTags]);
+                    }}
+                    className="mt-2 px-2 py-1 bg-blue-600 text-white text-xs rounded"
+                  >
+                    Force Refresh
+                  </button>
+                </div>
+              )}
+
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-700">
+              <button
+                onClick={() => setShowTagModal(false)}
                 className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition"
               >
                 Done
