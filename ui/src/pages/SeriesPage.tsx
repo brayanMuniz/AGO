@@ -4,12 +4,8 @@ import EntityDetailPage from "../components/EntityDetailPage";
 const SeriesPage: React.FC = () => {
   return (
     <EntityDetailPage
-      entityTypeSingular="Series"
-      entityTypePlural="Series"
+      entityTypeSingular="series"
       paramName="series"
-      apiEndpointPrefix="/api/series"
-      detailsResponseKey="seriesDetails"
-      backLink="/series"
       icon="🎞️"
     />
   );

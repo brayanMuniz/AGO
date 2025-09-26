@@ -4,12 +4,8 @@ import EntityDetailPage from "../components/EntityDetailPage";
 const CharacterPage: React.FC = () => {
   return (
     <EntityDetailPage
-      entityTypeSingular="Character"
-      entityTypePlural="Characters"
+      entityTypeSingular="character"
       paramName="character"
-      apiEndpointPrefix="/api/character"
-      detailsResponseKey="characterDetails"
-      backLink="/characters"
       icon="🧑‍🎤"
     />
   );

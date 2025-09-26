@@ -4,14 +4,10 @@ import EntityDetailPage from "../components/EntityDetailPage";
 const ExplicitnessPage: React.FC = () => {
   return (
     <EntityDetailPage
-      entityTypeSingular="Explicitness"
-      entityTypePlural="Explicitness"
+      entityTypeSingular="explicitness"
       paramName="explicitness"
-      apiEndpointPrefix="/api/categories/explicitness"
-      detailsResponseKey="explicitnessDetails"
-      backLink="/explicitness"
       icon="🔞"
-      tagFormatter={(explicitness) => `rating_${explicitness}`}
+      tagFormatter={(explicitness) => explicitness}
     />
   );
 };
