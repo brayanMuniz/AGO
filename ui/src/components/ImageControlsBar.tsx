@@ -1,9 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface ExportData {
   images: number[];
   exportName: string;
   exportType: string;
+}
+
+interface CharacterFilter {
+  id: number;
+  name: string;
+  type: 'include' | 'exclude';
 }
 
 interface ImageControlsBarProps {
@@ -19,6 +25,10 @@ interface ImageControlsBarProps {
   imageSize: 'small' | 'medium' | 'large';
   onImageSizeChange: (size: 'small' | 'medium' | 'large') => void;
   
+  // Filter controls
+  characterFilters?: CharacterFilter[];
+  onCharacterFiltersChange?: (filters: CharacterFilter[]) => void;
+  
   // Export controls
   exportData?: ExportData;
   onExport?: () => void;
@@ -27,6 +37,7 @@ interface ImageControlsBarProps {
   showSortControls?: boolean;
   showPaginationControls?: boolean;
   showImageSizeControls?: boolean;
+  showFilterControls?: boolean;
   showExportControls?: boolean;
 }
 
@@ -37,24 +48,58 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   onItemsPerPageChange,
   imageSize,
   onImageSizeChange,
+  characterFilters = [],
+  onCharacterFiltersChange,
   exportData,
   onExport,
   showSortControls = true,
   showPaginationControls = true,
   showImageSizeControls = true,
+  showFilterControls = true,
   showExportControls = true,
 }) => {
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
+  const [characterSearch, setCharacterSearch] = useState("");
+  const [availableCharacters, setAvailableCharacters] = useState<any[]>([]);
+  const [loadingCharacters, setLoadingCharacters] = useState(false);
+
+  useEffect(() => {
+    if (showCharacterModal) {
+      const fetchCharacters = async () => {
+        try {
+          setLoadingCharacters(true);
+          const response = await fetch('/api/categories/characters');
+          if (response.ok) {
+            const data = await response.json();
+            // The API returns { tags: [...] } not a direct array
+            const charactersArray = Array.isArray(data.tags) ? data.tags : [];
+            setAvailableCharacters(charactersArray);
+          } else {
+            console.error('Failed to fetch characters, status:', response.status);
+            setAvailableCharacters([]);
+          }
+        } catch (error) {
+          console.error('Failed to fetch characters:', error);
+          setAvailableCharacters([]);
+        } finally {
+          setLoadingCharacters(false);
+        }
+      };
+      fetchCharacters();
+    }
+  }, [showCharacterModal]);
+
   return (
-    <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-gray-800 rounded-lg">
-      {/* Sort By Dropdown */}
+    <div className="flex flex-wrap items-center gap-3 mb-6 p-3 bg-gray-800 rounded-lg">
+      {/* Sort By Dropdown - Compact */}
       {showSortControls && (
-        <div className="flex items-center gap-2">
-          <label className="text-white text-sm font-medium">Sort by:</label>
+        <div className="flex items-center gap-1">
           <select
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value)}
-            className="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-pink-500 focus:outline-none"
+            className="bg-gray-700 text-white px-2 py-1 text-sm rounded border border-gray-600 focus:border-pink-500 focus:outline-none"
           >
             <option value="random">Random</option>
             <option value="date_desc">Date (Newest)</option>
@@ -67,14 +112,13 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
         </div>
       )}
 
-      {/* Items Per Page Dropdown */}
+      {/* Items Per Page Dropdown - Compact */}
       {showPaginationControls && (
-        <div className="flex items-center gap-2">
-          <label className="text-white text-sm font-medium">Per page:</label>
+        <div className="flex items-center gap-1">
           <select
             value={itemsPerPage}
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-            className="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-pink-500 focus:outline-none"
+            className="bg-gray-700 text-white px-2 py-1 text-sm rounded border border-gray-600 focus:border-pink-500 focus:outline-none"
           >
             <option value={10}>10</option>
             <option value={20}>20</option>
@@ -86,26 +130,48 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
         </div>
       )}
 
-      {/* Image Size Slider */}
+      {/* Image Size Slider - Compact */}
       {showImageSizeControls && (
         <div className="flex items-center gap-2">
-          <label className="text-white text-sm font-medium">Image size:</label>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400 text-xs">Small</span>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="1"
-              value={imageSize === 'small' ? 0 : imageSize === 'medium' ? 1 : 2}
-              onChange={(e) => {
-                const sizes: ('small' | 'medium' | 'large')[] = ['small', 'medium', 'large'];
-                onImageSizeChange(sizes[Number(e.target.value)]);
-              }}
-              className="w-20 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
-            />
-            <span className="text-gray-400 text-xs">Large</span>
-          </div>
+          <input
+            type="range"
+            min="0"
+            max="2"
+            step="1"
+            value={imageSize === 'small' ? 0 : imageSize === 'medium' ? 1 : 2}
+            onChange={(e) => {
+              const sizes: ('small' | 'medium' | 'large')[] = ['small', 'medium', 'large'];
+              onImageSizeChange(sizes[Number(e.target.value)]);
+            }}
+            className="w-16 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+          />
+        </div>
+      )}
+
+      {/* Filter Dropdown */}
+      {showFilterControls && (
+        <div className="relative">
+          <button
+            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+            className="flex items-center gap-1 bg-gray-700 text-white px-2 py-1 text-sm rounded border border-gray-600 hover:border-pink-500 focus:border-pink-500 focus:outline-none"
+          >
+            <span>Filter</span>
+            <span className="text-xs">▼</span>
+          </button>
+          
+          {showFilterDropdown && (
+            <div className="absolute top-full left-0 mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg z-10 min-w-32">
+              <button
+                onClick={() => {
+                  setShowCharacterModal(true);
+                  setShowFilterDropdown(false);
+                }}
+                className="w-full text-left px-3 py-2 text-white text-sm hover:bg-gray-600"
+              >
+                Character
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -116,7 +182,7 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
             onClick={() => setShowExportModal(true)}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded border border-green-500 focus:border-green-400 focus:outline-none transition-colors"
           >
-            📤 Export ({exportData.images.length})
+            Export ({exportData.images.length})
           </button>
         </div>
       )}
@@ -166,6 +232,158 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
                 className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Character Filter Modal */}
+      {showCharacterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 h-[500px] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Character Filter</h2>
+              <button
+                onClick={() => setShowCharacterModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Current Filters */}
+            {characterFilters.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-white text-sm font-medium mb-2">Current Filters:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {characterFilters.map((filter, index) => (
+                    <span
+                      key={index}
+                      className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${
+                        filter.type === 'include' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-red-600 text-white'
+                      }`}
+                    >
+                      {filter.type === 'include' ? 'Include' : 'Exclude'}: {filter.name}
+                      <button
+                        onClick={() => {
+                          const newFilters = characterFilters.filter((_, i) => i !== index);
+                          onCharacterFiltersChange?.(newFilters);
+                        }}
+                        className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Search Input */}
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search characters..."
+                value={characterSearch}
+                onChange={(e) => setCharacterSearch(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                autoFocus
+              />
+            </div>
+
+            {/* Fixed height content area */}
+            <div className="flex-1 overflow-hidden">
+              {loadingCharacters && (
+                <div className="text-center text-gray-400 py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-500 mx-auto"></div>
+                  <p className="mt-2">Loading characters...</p>
+                </div>
+              )}
+
+              {!loadingCharacters && Array.isArray(availableCharacters) && availableCharacters.length > 0 && (
+                <div className="h-full flex flex-col">
+                  <h3 className="text-sm font-semibold text-gray-300 mb-2">Characters ({availableCharacters.length} total):</h3>
+                  <div className="flex-1 overflow-y-auto space-y-1">
+                    {availableCharacters
+                      .filter(char => 
+                        !characterSearch || char.name.toLowerCase().includes(characterSearch.toLowerCase())
+                      )
+                      .slice(0, 50)
+                      .map((character) => (
+                        <div key={character.id} className="flex items-center justify-between p-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm">
+                          <span>{character.name}</span>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                const newFilter: CharacterFilter = {
+                                  id: character.id,
+                                  name: character.name,
+                                  type: 'include'
+                                };
+                                const newFilters = [...characterFilters.filter(f => f.id !== character.id), newFilter];
+                                onCharacterFiltersChange?.(newFilters);
+                                setCharacterSearch("");
+                              }}
+                              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
+                            >
+                              Include
+                            </button>
+                            <button
+                              onClick={() => {
+                                const newFilter: CharacterFilter = {
+                                  id: character.id,
+                                  name: character.name,
+                                  type: 'exclude'
+                                };
+                                const newFilters = [...characterFilters.filter(f => f.id !== character.id), newFilter];
+                                onCharacterFiltersChange?.(newFilters);
+                                setCharacterSearch("");
+                              }}
+                              className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                            >
+                              Exclude
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {!loadingCharacters && availableCharacters.length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <p>No characters available</p>
+                  <p className="text-sm mt-1">Check console for errors</p>
+                  <p className="text-xs mt-1 text-blue-400">Debug: {JSON.stringify({
+                    loading: loadingCharacters,
+                    count: availableCharacters.length,
+                    isArray: Array.isArray(availableCharacters),
+                    firstChar: availableCharacters[0]?.name || 'none',
+                    timestamp: Date.now()
+                  })}</p>
+                  <button 
+                    onClick={() => {
+                      console.log('Force refresh - current state:', availableCharacters);
+                      setAvailableCharacters([...availableCharacters]);
+                    }}
+                    className="mt-2 px-2 py-1 bg-blue-600 text-white text-xs rounded"
+                  >
+                    Force Refresh
+                  </button>
+                </div>
+              )}
+
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-700">
+              <button
+                onClick={() => setShowCharacterModal(false)}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition"
+              >
+                Done
               </button>
             </div>
           </div>

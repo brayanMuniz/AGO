@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import Sidebar from "./SideBar";
 import MobileNav from "./MobileNav";
 import GalleryView from "./GalleryView";
 import ImageControlsBar from "./ImageControlsBar";
+import FilterDisplay from "./FilterDisplay";
 import Pagination from "./Pagination";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useUrlParams } from "../hooks/useUrlParams";
@@ -78,7 +79,22 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
   });
   
   // URL parameters for controls
-  const { sortBy, perPage: itemsPerPage, imageSize, page, seed, backendSortBy, setPerPage: setItemsPerPage, setImageSize, setPage, getBackendSortValue, handleBackendSortChange } = useUrlParams();
+  const { 
+    sortBy, 
+    perPage: itemsPerPage, 
+    imageSize, 
+    page, 
+    seed, 
+    includeCharacters, 
+    excludeCharacters,
+    backendSortBy, 
+    setPerPage: setItemsPerPage, 
+    setImageSize, 
+    setPage, 
+    setCharacterFilters,
+    getBackendSortValue, 
+    handleBackendSortChange 
+  } = useUrlParams();
   const [isExporting, setIsExporting] = useState(false);
 
   // Handler wrappers for type compatibility
@@ -88,6 +104,24 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
 
   const handleItemsPerPageChange = (limit: number) => {
     setItemsPerPage(limit as any); // Type assertion, will be validated in hook
+  };
+
+  const handleRemoveCharacterFilter = (characterName: string, type: 'include' | 'exclude') => {
+    if (type === 'include') {
+      const newInclude = includeCharacters?.filter(name => name !== characterName) || [];
+      setCharacterFilters(newInclude.length > 0 ? newInclude : undefined, excludeCharacters);
+    } else {
+      const newExclude = excludeCharacters?.filter(name => name !== characterName) || [];
+      setCharacterFilters(includeCharacters, newExclude.length > 0 ? newExclude : undefined);
+    }
+  };
+
+  const handleClearAllFilters = () => {
+    setCharacterFilters(undefined, undefined);
+  };
+
+  const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
+    setImageSize(newSize);
   };
 
   const handleImageSelect = (imageId: number) => {
@@ -202,7 +236,12 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       
       const tagName = tagFormatter ? tagFormatter(entityName) : entityName;
       const seedParam = seed ? `&seed=${seed}` : '';
-      const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}`;
+      const includeCharactersParam = includeCharacters && includeCharacters.length > 0 
+        ? `&include_characters=${includeCharacters.join(',')}` : '';
+      const excludeCharactersParam = excludeCharacters && excludeCharacters.length > 0 
+        ? `&exclude_characters=${excludeCharacters.join(',')}` : '';
+      
+      const url = `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}`;
       const res = await fetch(url);
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -275,12 +314,22 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
     }
   };
 
+  // Memoize character filter strings to prevent unnecessary re-renders
+  const includeCharactersString = useMemo(() => 
+    includeCharacters ? includeCharacters.join(',') : '', 
+    [includeCharacters]
+  );
+  const excludeCharactersString = useMemo(() => 
+    excludeCharacters ? excludeCharacters.join(',') : '', 
+    [excludeCharacters]
+  );
+
   useEffect(() => {
     // Reset loading state when parameters change
     setLoading(true);
     fetchImages(page);
     fetchTagInfo();
-  }, [entityName, entityTypeSingular, sortBy, itemsPerPage, page]);
+  }, [entityName, sortBy, itemsPerPage, page, includeCharactersString, excludeCharactersString]);
 
   if (loading && images.length === 0) {
     return (
@@ -433,7 +482,19 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
             itemsPerPage={itemsPerPage}
             onItemsPerPageChange={handleItemsPerPageChange}
             imageSize={imageSize}
-            onImageSizeChange={setImageSize}
+            onImageSizeChange={handleImageSizeChange}
+            characterFilters={[
+              ...(includeCharacters || []).map(name => ({ id: 0, name, type: 'include' as const })),
+              ...(excludeCharacters || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+            ]}
+            onCharacterFiltersChange={(filters) => {
+              const include = filters.filter(f => f.type === 'include').map(f => f.name);
+              const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+              setCharacterFilters(
+                include.length > 0 ? include : undefined,
+                exclude.length > 0 ? exclude : undefined
+              );
+            }}
             exportData={entityName ? {
               images: images.map(img => img.id),
               exportName: entityName,
@@ -442,6 +503,13 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
             onExport={handleExport}
           />
 
+          {/* Filter Display */}
+          <FilterDisplay
+            includeCharacters={includeCharacters}
+            excludeCharacters={excludeCharacters}
+            onRemoveCharacterFilter={handleRemoveCharacterFilter}
+            onClearAllFilters={handleClearAllFilters}
+          />
           {/* Error Display */}
           {error && (
             <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded mb-6">

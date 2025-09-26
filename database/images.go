@@ -174,7 +174,7 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string) ([]ImageResult, int, error) {
+func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string, includeCharacters, excludeCharacters []string) ([]ImageResult, int, error) {
 	if len(tags) == 0 {
 		return nil, 0, fmt.Errorf("no tags provided")
 	}
@@ -207,7 +207,45 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		orderBy = "ORDER BY RANDOM()"
 	}
 
+	// Create placeholders for IN clause
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(tags)), ",")
+
+	// Build character filter conditions
+	var characterConditions []string
+	var characterArgs []any
+
+	if len(includeCharacters) > 0 {
+		includePlaceholders := strings.TrimRight(strings.Repeat("?,", len(includeCharacters)), ",")
+		characterConditions = append(characterConditions, fmt.Sprintf(`
+			images.id IN (
+				SELECT DISTINCT it.image_id 
+				FROM image_tags it 
+				JOIN tags t ON it.tag_id = t.id 
+				WHERE t.name IN (%s) AND t.category = 'character'
+			)`, includePlaceholders))
+		for _, char := range includeCharacters {
+			characterArgs = append(characterArgs, char)
+		}
+	}
+
+	if len(excludeCharacters) > 0 {
+		excludePlaceholders := strings.TrimRight(strings.Repeat("?,", len(excludeCharacters)), ",")
+		characterConditions = append(characterConditions, fmt.Sprintf(`
+			images.id NOT IN (
+				SELECT DISTINCT it.image_id 
+				FROM image_tags it 
+				JOIN tags t ON it.tag_id = t.id 
+				WHERE t.name IN (%s) AND t.category = 'character'
+			)`, excludePlaceholders))
+		for _, char := range excludeCharacters {
+			characterArgs = append(characterArgs, char)
+		}
+	}
+
+	characterWhereClause := ""
+	if len(characterConditions) > 0 {
+		characterWhereClause = " AND " + strings.Join(characterConditions, " AND ")
+	}
 
 	// Get total count first
 	countQuery := fmt.Sprintf(`
@@ -215,16 +253,19 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		FROM images
 		JOIN image_tags ON images.id = image_tags.image_id
 		JOIN tags ON tags.id = image_tags.tag_id
-		WHERE tags.name IN (%s)
+		WHERE tags.name IN (%s) %s
 		GROUP BY images.id
 		HAVING COUNT(DISTINCT tags.name) = ?
-	`, placeholders)
+	`, placeholders, characterWhereClause)
 
-	args := make([]any, len(tags)+1)
+	args := make([]any, len(tags)+len(characterArgs)+1)
 	for i, tag := range tags {
 		args[i] = tag
 	}
-	args[len(tags)] = len(tags)
+	for i, charArg := range characterArgs {
+		args[len(tags)+i] = charArg
+	}
+	args[len(tags)+len(characterArgs)] = len(tags)
 
 	// Count total matching images
 	var totalCount int
@@ -252,20 +293,23 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		FROM images
 		JOIN image_tags ON images.id = image_tags.image_id
 		JOIN tags ON tags.id = image_tags.tag_id
-		WHERE tags.name IN (%s)
+		WHERE tags.name IN (%s) %s
 		GROUP BY images.id
 		HAVING COUNT(DISTINCT tags.name) = ?
 		%s
 		LIMIT ? OFFSET ?
-	`, placeholders, orderBy)
+	`, placeholders, characterWhereClause, orderBy)
 
-	paginatedArgs := make([]any, len(tags)+3)
+	paginatedArgs := make([]any, len(tags)+len(characterArgs)+3)
 	for i, tag := range tags {
 		paginatedArgs[i] = tag
 	}
-	paginatedArgs[len(tags)] = len(tags)
-	paginatedArgs[len(tags)+1] = limit
-	paginatedArgs[len(tags)+2] = offset
+	for i, charArg := range characterArgs {
+		paginatedArgs[len(tags)+i] = charArg
+	}
+	paginatedArgs[len(tags)+len(characterArgs)] = len(tags)
+	paginatedArgs[len(tags)+len(characterArgs)+1] = limit
+	paginatedArgs[len(tags)+len(characterArgs)+2] = offset
 
 	rows, err := db.Query(query, paginatedArgs...)
 	if err != nil {

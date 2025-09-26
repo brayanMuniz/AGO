@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
 import GalleryView from "../components/GalleryView";
-import ImageControlsBar from "../components/ImageControlsBar";
 import Pagination from "../components/Pagination";
+import ImageControlsBar from "../components/ImageControlsBar";
+import FilterDisplay from "../components/FilterDisplay";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useUrlParams } from "../hooks/useUrlParams";
 
@@ -77,7 +78,22 @@ const AlbumDetailPage: React.FC = () => {
   });
   
   // URL parameters for controls
-  const { sortBy, perPage: itemsPerPage, imageSize, page, seed, backendSortBy, setPerPage: setItemsPerPage, setImageSize, setPage, getBackendSortValue, handleBackendSortChange } = useUrlParams();
+  const { 
+    sortBy, 
+    perPage: itemsPerPage, 
+    imageSize, 
+    page, 
+    seed, 
+    includeCharacters, 
+    excludeCharacters,
+    backendSortBy, 
+    setPerPage: setItemsPerPage, 
+    setImageSize, 
+    setPage, 
+    setCharacterFilters,
+    getBackendSortValue, 
+    handleBackendSortChange 
+  } = useUrlParams();
   const [isExporting, setIsExporting] = useState(false);
 
   // Handler wrappers for type compatibility
@@ -87,6 +103,24 @@ const AlbumDetailPage: React.FC = () => {
 
   const handleItemsPerPageChange = (limit: number) => {
     setItemsPerPage(limit as any); // Type assertion, will be validated in hook
+  };
+
+  const handleRemoveCharacterFilter = (characterName: string, type: 'include' | 'exclude') => {
+    if (type === 'include') {
+      const newInclude = includeCharacters?.filter(name => name !== characterName) || [];
+      setCharacterFilters(newInclude.length > 0 ? newInclude : undefined, excludeCharacters);
+    } else {
+      const newExclude = excludeCharacters?.filter(name => name !== characterName) || [];
+      setCharacterFilters(includeCharacters, newExclude.length > 0 ? newExclude : undefined);
+    }
+  };
+
+  const handleClearAllFilters = () => {
+    setCharacterFilters(undefined, undefined);
+  };
+
+  const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
+    setImageSize(newSize);
   };
 
   useEffect(() => {
@@ -126,12 +160,22 @@ const AlbumDetailPage: React.FC = () => {
     fetchAlbumData();
   }, [id]);
 
+  // Memoize character filter strings to prevent unnecessary re-renders
+  const includeCharactersString = useMemo(() => 
+    includeCharacters ? includeCharacters.join(',') : '', 
+    [includeCharacters]
+  );
+  const excludeCharactersString = useMemo(() => 
+    excludeCharacters ? excludeCharacters.join(',') : '', 
+    [excludeCharacters]
+  );
+
   // Refetch images when controls change
   useEffect(() => {
     if (id) {
       fetchImages(page);
     }
-  }, [sortBy, itemsPerPage, page]);
+  }, [sortBy, itemsPerPage, page, includeCharactersString, excludeCharactersString]);
 
   const handleImageSelect = (imageId: number) => {
     if (!isSelectingImages) return;
@@ -280,7 +324,12 @@ const AlbumDetailPage: React.FC = () => {
     try {
       setLoading(true);
       const seedParam = seed ? `&seed=${seed}` : '';
-      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}`;
+      const includeCharactersParam = includeCharacters && includeCharacters.length > 0 
+        ? `&include_characters=${includeCharacters.join(',')}` : '';
+      const excludeCharactersParam = excludeCharacters && excludeCharacters.length > 0 
+        ? `&exclude_characters=${excludeCharacters.join(',')}` : '';
+      
+      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}`;
       const imagesResponse = await fetch(url);
       if (!imagesResponse.ok) {
         throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
@@ -802,13 +851,33 @@ const AlbumDetailPage: React.FC = () => {
             itemsPerPage={itemsPerPage}
             onItemsPerPageChange={handleItemsPerPageChange}
             imageSize={imageSize}
-            onImageSizeChange={setImageSize}
+            onImageSizeChange={handleImageSizeChange}
+            characterFilters={[
+              ...(includeCharacters || []).map(name => ({ id: 0, name, type: 'include' as const })),
+              ...(excludeCharacters || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+            ]}
+            onCharacterFiltersChange={(filters) => {
+              const include = filters.filter(f => f.type === 'include').map(f => f.name);
+              const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+              setCharacterFilters(
+                include.length > 0 ? include : undefined,
+                exclude.length > 0 ? exclude : undefined
+              );
+            }}
             exportData={album ? {
               images: images.map(img => img.id),
               exportName: album.name,
               exportType: 'album'
             } : undefined}
             onExport={handleExport}
+          />
+
+          {/* Filter Display */}
+          <FilterDisplay
+            includeCharacters={includeCharacters}
+            excludeCharacters={excludeCharacters}
+            onRemoveCharacterFilter={handleRemoveCharacterFilter}
+            onClearAllFilters={handleClearAllFilters}
           />
 
           {/* Error Display */}

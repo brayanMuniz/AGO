@@ -23,6 +23,8 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 		sortBy := c.DefaultQuery("sort", "random")
 		seed := c.DefaultQuery("seed", "")
+		includeCharacters := c.DefaultQuery("include_characters", "")
+		excludeCharacters := c.DefaultQuery("exclude_characters", "")
 
 		if page < 1 {
 			page = 1
@@ -59,24 +61,74 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 			orderBy = "ORDER BY RANDOM()"
 		}
 
-		// Get total count
+		// Build WHERE clause for character filtering
+		var whereClause string
+		var queryArgs []interface{}
+		var countArgs []interface{}
+
+		if includeCharacters != "" || excludeCharacters != "" {
+			var conditions []string
+			
+			if includeCharacters != "" {
+				// Images must have at least one of the included characters
+				characters := strings.Split(includeCharacters, ",")
+				placeholders := make([]string, len(characters))
+				for i, char := range characters {
+					placeholders[i] = "?"
+					queryArgs = append(queryArgs, strings.TrimSpace(char))
+					countArgs = append(countArgs, strings.TrimSpace(char))
+				}
+				conditions = append(conditions, fmt.Sprintf(`
+					images.id IN (
+						SELECT DISTINCT it.image_id 
+						FROM image_tags it 
+						JOIN tags t ON it.tag_id = t.id 
+						WHERE t.name IN (%s) AND t.category = 'character'
+					)`, strings.Join(placeholders, ",")))
+			}
+			
+			if excludeCharacters != "" {
+				// Images must NOT have any of the excluded characters
+				characters := strings.Split(excludeCharacters, ",")
+				placeholders := make([]string, len(characters))
+				for i, char := range characters {
+					placeholders[i] = "?"
+					queryArgs = append(queryArgs, strings.TrimSpace(char))
+					countArgs = append(countArgs, strings.TrimSpace(char))
+				}
+				conditions = append(conditions, fmt.Sprintf(`
+					images.id NOT IN (
+						SELECT DISTINCT it.image_id 
+						FROM image_tags it 
+						JOIN tags t ON it.tag_id = t.id 
+						WHERE t.name IN (%s) AND t.category = 'character'
+					)`, strings.Join(placeholders, ",")))
+			}
+			
+			whereClause = "WHERE " + strings.Join(conditions, " AND ")
+		}
+
+		// Get total count with filters
 		var totalCount int
-		countQuery := "SELECT COUNT(*) FROM images"
-		err := db.QueryRow(countQuery).Scan(&totalCount)
+		countQuery := fmt.Sprintf("SELECT COUNT(*) FROM images %s", whereClause)
+		err := db.QueryRow(countQuery, countArgs...).Scan(&totalCount)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count images"})
 			return
 		}
 
-		// Get images with pagination
+		// Get images with pagination and filters
 		query := fmt.Sprintf(`
 			SELECT id, phash, filename, width, height, favorite, like_count, rating
 			FROM images
 			%s
+			%s
 			LIMIT ? OFFSET ?
-		`, orderBy)
+		`, whereClause, orderBy)
 
-		rows, err := db.Query(query, limit, offset)
+		// Add limit and offset to query args
+		queryArgs = append(queryArgs, limit, offset)
+		rows, err := db.Query(query, queryArgs...)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch images"})
 			return
@@ -145,6 +197,8 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "20"))
 		sortBy := ctx.DefaultQuery("sort", "random")
 		seed := ctx.DefaultQuery("seed", "")
+		includeCharacters := ctx.DefaultQuery("include_characters", "")
+		excludeCharacters := ctx.DefaultQuery("exclude_characters", "")
 
 		if page < 1 {
 			page = 1
@@ -158,8 +212,23 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 			tagList[i] = strings.TrimSpace(tagList[i])
 		}
 
+		// Parse character filters
+		var includeCharactersList, excludeCharactersList []string
+		if includeCharacters != "" {
+			includeCharactersList = strings.Split(includeCharacters, ",")
+			for i := range includeCharactersList {
+				includeCharactersList[i] = strings.TrimSpace(includeCharactersList[i])
+			}
+		}
+		if excludeCharacters != "" {
+			excludeCharactersList = strings.Split(excludeCharacters, ",")
+			for i := range excludeCharactersList {
+				excludeCharactersList[i] = strings.TrimSpace(excludeCharactersList[i])
+			}
+		}
+
 		// Get paginated results
-		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy, seed)
+		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy, seed, includeCharactersList, excludeCharactersList)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": err.Error()})
 			return

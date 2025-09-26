@@ -53,6 +53,8 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 		sortBy := c.DefaultQuery("sort", "random")
 		seed := c.DefaultQuery("seed", "")
+		includeCharacters := c.DefaultQuery("include_characters", "")
+		excludeCharacters := c.DefaultQuery("exclude_characters", "")
 
 		if page < 1 {
 			page = 1
@@ -72,6 +74,47 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 		var images []database.ImageResult
 		var totalCount int
+
+		// Build character filter conditions
+		var characterConditions []string
+		var characterArgs []interface{}
+
+		if includeCharacters != "" {
+			characters := strings.Split(includeCharacters, ",")
+			placeholders := make([]string, len(characters))
+			for i, char := range characters {
+				placeholders[i] = "?"
+				characterArgs = append(characterArgs, strings.TrimSpace(char))
+			}
+			characterConditions = append(characterConditions, fmt.Sprintf(`
+				images.id IN (
+					SELECT DISTINCT it.image_id 
+					FROM image_tags it 
+					JOIN tags t ON it.tag_id = t.id 
+					WHERE t.name IN (%s) AND t.category = 'character'
+				)`, strings.Join(placeholders, ",")))
+		}
+
+		if excludeCharacters != "" {
+			characters := strings.Split(excludeCharacters, ",")
+			placeholders := make([]string, len(characters))
+			for i, char := range characters {
+				placeholders[i] = "?"
+				characterArgs = append(characterArgs, strings.TrimSpace(char))
+			}
+			characterConditions = append(characterConditions, fmt.Sprintf(`
+				images.id NOT IN (
+					SELECT DISTINCT it.image_id 
+					FROM image_tags it 
+					JOIN tags t ON it.tag_id = t.id 
+					WHERE t.name IN (%s) AND t.category = 'character'
+				)`, strings.Join(placeholders, ",")))
+		}
+
+		characterWhereClause := ""
+		if len(characterConditions) > 0 {
+			characterWhereClause = " AND " + strings.Join(characterConditions, " AND ")
+		}
 
 		// Build order by clause
 		var orderBy string
@@ -101,28 +144,37 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 		if albumType == "manual" {
 			// Get total count
-			err = db.QueryRow(`
+			countQuery := fmt.Sprintf(`
 				SELECT COUNT(*)
 				FROM album_images
 				JOIN images ON album_images.image_id = images.id
-				WHERE album_images.album_id = ?
-			`, id).Scan(&totalCount)
+				WHERE album_images.album_id = ? %s
+			`, characterWhereClause)
+			
+			countArgs := []interface{}{id}
+			countArgs = append(countArgs, characterArgs...)
+			
+			err = db.QueryRow(countQuery, countArgs...).Scan(&totalCount)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return
 			}
 
 			// Get paginated results
-			query := `
+			query := fmt.Sprintf(`
 				SELECT images.id, images.phash, images.filename, images.width, images.height, images.favorite, images.like_count, images.rating
 				FROM album_images
 				JOIN images ON album_images.image_id = images.id
-				WHERE album_images.album_id = ?
-				` + orderBy + `
+				WHERE album_images.album_id = ? %s
+				%s
 				LIMIT ? OFFSET ?
-			`
+			`, characterWhereClause, orderBy)
 
-			rows, err := db.Query(query, id, limit, offset)
+			queryArgs := []interface{}{id}
+			queryArgs = append(queryArgs, characterArgs...)
+			queryArgs = append(queryArgs, limit, offset)
+			
+			rows, err := db.Query(query, queryArgs...)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return
@@ -141,7 +193,23 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 		} else if albumType == "smart" {
 			albumID, _ := strconv.Atoi(id)
-			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, page, limit, sortBy)
+			
+			// Parse character filters for smart albums
+			var includeCharactersList, excludeCharactersList []string
+			if includeCharacters != "" {
+				includeCharactersList = strings.Split(includeCharacters, ",")
+				for i := range includeCharactersList {
+					includeCharactersList[i] = strings.TrimSpace(includeCharactersList[i])
+				}
+			}
+			if excludeCharacters != "" {
+				excludeCharactersList = strings.Split(excludeCharacters, ",")
+				for i := range excludeCharactersList {
+					excludeCharactersList[i] = strings.TrimSpace(excludeCharactersList[i])
+				}
+			}
+			
+			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, page, limit, sortBy, includeCharactersList, excludeCharactersList)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return

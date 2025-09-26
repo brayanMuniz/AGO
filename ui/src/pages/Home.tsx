@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
 import GalleryView from "../components/GalleryView";
 import Pagination from "../components/Pagination";
 import ImageControlsBar from "../components/ImageControlsBar";
+import FilterDisplay from "../components/FilterDisplay";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useUrlParams } from "../hooks/useUrlParams";
 
@@ -34,7 +35,22 @@ const Home = () => {
   });
   
   // URL parameters for controls
-  const { sortBy, perPage: itemsPerPage, imageSize, page, seed, backendSortBy, setPerPage: setItemsPerPage, setImageSize, setPage, getBackendSortValue, handleBackendSortChange } = useUrlParams();
+  const { 
+    sortBy, 
+    perPage: itemsPerPage, 
+    imageSize, 
+    page, 
+    seed, 
+    includeCharacters, 
+    excludeCharacters,
+    backendSortBy, 
+    setPerPage: setItemsPerPage, 
+    setImageSize, 
+    setPage, 
+    setCharacterFilters,
+    getBackendSortValue, 
+    handleBackendSortChange 
+  } = useUrlParams();
 
   const fetchImages = async (pageNum: number = page) => {
     try {
@@ -42,8 +58,13 @@ const Home = () => {
       setError(null);
       
       const seedParam = seed ? `&seed=${seed}` : '';
+      const includeCharactersParam = includeCharacters && includeCharacters.length > 0 
+        ? `&include_characters=${includeCharacters.join(',')}` : '';
+      const excludeCharactersParam = excludeCharacters && excludeCharacters.length > 0 
+        ? `&exclude_characters=${excludeCharacters.join(',')}` : '';
+      
       const response = await fetch(
-        `/api/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}`
+        `/api/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}`
       );
       
       if (!response.ok) {
@@ -61,9 +82,19 @@ const Home = () => {
     }
   };
 
+  // Memoize character filter strings to prevent unnecessary re-renders
+  const includeCharactersString = useMemo(() => 
+    includeCharacters ? includeCharacters.join(',') : '', 
+    [includeCharacters]
+  );
+  const excludeCharactersString = useMemo(() => 
+    excludeCharacters ? excludeCharacters.join(',') : '', 
+    [excludeCharacters]
+  );
+
   useEffect(() => {
     fetchImages(page);
-  }, [sortBy, itemsPerPage, page]);
+  }, [sortBy, itemsPerPage, page, includeCharactersString, excludeCharactersString]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
@@ -75,6 +106,20 @@ const Home = () => {
 
   const handleItemsPerPageChange = (newLimit: number) => {
     setItemsPerPage(newLimit as any); // Type assertion for now, will be validated in hook
+  };
+
+  const handleRemoveCharacterFilter = (characterName: string, type: 'include' | 'exclude') => {
+    if (type === 'include') {
+      const newInclude = includeCharacters?.filter(name => name !== characterName) || [];
+      setCharacterFilters(newInclude.length > 0 ? newInclude : undefined, excludeCharacters);
+    } else {
+      const newExclude = excludeCharacters?.filter(name => name !== characterName) || [];
+      setCharacterFilters(includeCharacters, newExclude.length > 0 ? newExclude : undefined);
+    }
+  };
+
+  const handleClearAllFilters = () => {
+    setCharacterFilters(undefined, undefined);
   };
 
   const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
@@ -112,13 +157,32 @@ const Home = () => {
             onItemsPerPageChange={handleItemsPerPageChange}
             imageSize={imageSize}
             onImageSizeChange={handleImageSizeChange}
+            characterFilters={[
+              ...(includeCharacters || []).map(name => ({ id: 0, name, type: 'include' as const })),
+              ...(excludeCharacters || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+            ]}
+            onCharacterFiltersChange={(filters) => {
+              const include = filters.filter(f => f.type === 'include').map(f => f.name);
+              const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+              setCharacterFilters(
+                include.length > 0 ? include : undefined,
+                exclude.length > 0 ? exclude : undefined
+              );
+            }}
             showExportControls={false}
+          />
+
+          {/* Filter Display */}
+          <FilterDisplay
+            includeCharacters={includeCharacters}
+            excludeCharacters={excludeCharacters}
+            onRemoveCharacterFilter={handleRemoveCharacterFilter}
+            onClearAllFilters={handleClearAllFilters}
           />
 
           {/* Error Display */}
           {error && (
             <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded mb-6">
-              Error: {error}
             </div>
           )}
 

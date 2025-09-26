@@ -11,6 +11,8 @@ export interface UrlParams {
   imageSize: ImageSize;
   page: number; // Current page number
   seed?: number; // Optional seed for random sorting
+  includeCharacters?: string[]; // Character names to include
+  excludeCharacters?: string[]; // Character names to exclude
 }
 
 const DEFAULT_PARAMS: UrlParams = {
@@ -52,6 +54,10 @@ export const useUrlParams = () => {
     const imageSize = (searchParams.get('image_size') as ImageSize) || DEFAULT_PARAMS.imageSize;
     const page = parseInt(searchParams.get('page') || '1');
     const seed = searchParams.get('seed') ? parseInt(searchParams.get('seed')!) : undefined;
+    
+    // Parse character filters
+    const includeCharacters = searchParams.get('include_characters')?.split(',').filter(Boolean) || undefined;
+    const excludeCharacters = searchParams.get('exclude_characters')?.split(',').filter(Boolean) || undefined;
 
     // Validate parameters - handle both user-friendly and backend parameter names
     let validSortBy: SortBy;
@@ -76,7 +82,9 @@ export const useUrlParams = () => {
       perPage: validPerPage,
       imageSize: validImageSize,
       page: validPage,
-      seed
+      seed,
+      includeCharacters,
+      excludeCharacters
     };
   }, [searchParams]);
 
@@ -108,6 +116,16 @@ export const useUrlParams = () => {
     if (updatedParams.seed !== undefined) {
       newSearchParams.set('seed', updatedParams.seed.toString());
     }
+    if (updatedParams.includeCharacters && updatedParams.includeCharacters.length > 0) {
+      newSearchParams.set('include_characters', updatedParams.includeCharacters.join(','));
+    } else if (updatedParams.includeCharacters !== undefined) {
+      newSearchParams.delete('include_characters');
+    }
+    if (updatedParams.excludeCharacters && updatedParams.excludeCharacters.length > 0) {
+      newSearchParams.set('exclude_characters', updatedParams.excludeCharacters.join(','));
+    } else if (updatedParams.excludeCharacters !== undefined) {
+      newSearchParams.delete('exclude_characters');
+    }
 
     setSearchParams(newSearchParams, { replace: true });
   }, [getCurrentParams, setSearchParams]);
@@ -136,6 +154,10 @@ export const useUrlParams = () => {
     updateParams({ page });
   }, [updateParams]);
 
+  const setCharacterFilters = useCallback((includeCharacters?: string[], excludeCharacters?: string[]) => {
+    updateParams({ includeCharacters, excludeCharacters });
+  }, [updateParams]);
+
   // Handle backend parameter changes from ImageControlsBar
   const handleBackendSortChange = useCallback((backendSort: string) => {
     const userFriendlySort = REVERSE_SORT_MAP[backendSort];
@@ -154,6 +176,8 @@ export const useUrlParams = () => {
     imageSize: params.imageSize,
     page: params.page,
     seed: params.seed,
+    includeCharacters: params.includeCharacters,
+    excludeCharacters: params.excludeCharacters,
     
     // Backend values for components that expect them
     backendSortBy: getBackendSortValue(params.sortBy),
@@ -163,6 +187,7 @@ export const useUrlParams = () => {
     setPerPage,
     setImageSize,
     setPage,
+    setCharacterFilters,
     updateParams,
     handleBackendSortChange,
     
