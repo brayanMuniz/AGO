@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
@@ -86,16 +86,18 @@ const AlbumDetailPage: React.FC = () => {
     seed, 
     includeCharacters, 
     excludeCharacters,
+    includeTags,
+    excludeTags,
     backendSortBy, 
     setPerPage: setItemsPerPage, 
     setImageSize, 
     setPage, 
     setCharacterFilters,
+    setTagFilters,
     getBackendSortValue, 
     handleBackendSortChange 
   } = useUrlParams();
-  const [isExporting, setIsExporting] = useState(false);
-
+  
   // Handler wrappers for type compatibility
   const handleSortChange = (sort: string) => {
     handleBackendSortChange(sort); // Handle backend parameter names from ImageControlsBar
@@ -115,8 +117,19 @@ const AlbumDetailPage: React.FC = () => {
     }
   };
 
+  const handleRemoveTagFilter = (tagName: string, type: 'include' | 'exclude') => {
+    if (type === 'include') {
+      const newInclude = includeTags?.filter(name => name !== tagName) || [];
+      setTagFilters(newInclude.length > 0 ? newInclude : undefined, excludeTags);
+    } else {
+      const newExclude = excludeTags?.filter(name => name !== tagName) || [];
+      setTagFilters(includeTags, newExclude.length > 0 ? newExclude : undefined);
+    }
+  };
+
   const handleClearAllFilters = () => {
     setCharacterFilters(undefined, undefined);
+    setTagFilters(undefined, undefined);
   };
 
   const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
@@ -147,9 +160,6 @@ const AlbumDetailPage: React.FC = () => {
           throw new Error("Album not found");
         }
         setAlbum(currentAlbum);
-
-        // Fetch album images with pagination
-        await fetchImages(1);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -160,22 +170,6 @@ const AlbumDetailPage: React.FC = () => {
     fetchAlbumData();
   }, [id]);
 
-  // Memoize character filter strings to prevent unnecessary re-renders
-  const includeCharactersString = useMemo(() => 
-    includeCharacters ? includeCharacters.join(',') : '', 
-    [includeCharacters]
-  );
-  const excludeCharactersString = useMemo(() => 
-    excludeCharacters ? excludeCharacters.join(',') : '', 
-    [excludeCharacters]
-  );
-
-  // Refetch images when controls change
-  useEffect(() => {
-    if (id) {
-      fetchImages(page);
-    }
-  }, [sortBy, itemsPerPage, page, includeCharactersString, excludeCharactersString]);
 
   const handleImageSelect = (imageId: number) => {
     if (!isSelectingImages) return;
@@ -328,8 +322,12 @@ const AlbumDetailPage: React.FC = () => {
         ? `&include_characters=${includeCharacters.join(',')}` : '';
       const excludeCharactersParam = excludeCharacters && excludeCharacters.length > 0 
         ? `&exclude_characters=${excludeCharacters.join(',')}` : '';
+      const includeTagsParam = includeTags && includeTags.length > 0 
+        ? `&include_tags=${includeTags.join(',')}` : '';
+      const excludeTagsParam = excludeTags && excludeTags.length > 0 
+        ? `&exclude_tags=${excludeTags.join(',')}` : '';
       
-      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}`;
+      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}`;
       const imagesResponse = await fetch(url);
       if (!imagesResponse.ok) {
         throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
@@ -355,9 +353,16 @@ const AlbumDetailPage: React.FC = () => {
     }
   };
 
-  const refreshAlbumImages = async () => {
-    await fetchImages(pagination.current_page);
-  };
+  // Refetch images when controls change
+  useEffect(() => {
+    if (id) {
+      const timeoutId = setTimeout(() => {
+        fetchImages(page);
+      }, 100); // Small delay to debounce rapid changes
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [id, sortBy, itemsPerPage, page, includeCharacters?.join(','), excludeCharacters?.join(','), includeTags?.join(','), excludeTags?.join(',')]);
 
   const fetchAllTags = async () => {
     if (allTags.length > 0) return;
@@ -524,7 +529,6 @@ const AlbumDetailPage: React.FC = () => {
   const handleExport = async () => {
     if (!album || images.length === 0) return;
 
-    setIsExporting(true);
     try {
       const imageIds = images.map(img => img.id);
       
@@ -553,8 +557,6 @@ const AlbumDetailPage: React.FC = () => {
     } catch (error) {
       console.error('Export error:', error);
       alert('Export failed. Please try again.');
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -864,6 +866,18 @@ const AlbumDetailPage: React.FC = () => {
                 exclude.length > 0 ? exclude : undefined
               );
             }}
+            tagFilters={[
+              ...(includeTags || []).map(name => ({ id: 0, name, type: 'include' as const })),
+              ...(excludeTags || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+            ]}
+            onTagFiltersChange={(filters) => {
+              const include = filters.filter(f => f.type === 'include').map(f => f.name);
+              const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+              setTagFilters(
+                include.length > 0 ? include : undefined,
+                exclude.length > 0 ? exclude : undefined
+              );
+            }}
             exportData={album ? {
               images: images.map(img => img.id),
               exportName: album.name,
@@ -876,7 +890,10 @@ const AlbumDetailPage: React.FC = () => {
           <FilterDisplay
             includeCharacters={includeCharacters}
             excludeCharacters={excludeCharacters}
+            includeTags={includeTags}
+            excludeTags={excludeTags}
             onRemoveCharacterFilter={handleRemoveCharacterFilter}
+            onRemoveTagFilter={handleRemoveTagFilter}
             onClearAllFilters={handleClearAllFilters}
           />
 

@@ -137,7 +137,7 @@ func GetSmartAlbumImages(db *sql.DB, albumID int) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sortBy string, includeCharacters, excludeCharacters []string) ([]ImageResult, int, error) {
+func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sortBy string, includeCharacters, excludeCharacters, includeTags, excludeTags []string) ([]ImageResult, int, error) {
 	var includeTagCSV, excludeTagCSV, includeAlbumCSV, excludeAlbumCSV string
 	var minRating int
 	var favoriteOnly bool
@@ -215,6 +215,37 @@ func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sort
 			)`, placeholders))
 		for _, char := range excludeCharacters {
 			args = append(args, char)
+		}
+	}
+
+	// Add tag filtering conditions (general tags)
+	if len(includeTags) > 0 {
+		placeholders := strings.Repeat("?,", len(includeTags))
+		placeholders = strings.TrimRight(placeholders, ",")
+		conditions = append(conditions, fmt.Sprintf(`
+			images.id IN (
+				SELECT DISTINCT it.image_id 
+				FROM image_tags it 
+				JOIN tags t ON it.tag_id = t.id 
+				WHERE t.name IN (%s) AND t.category = 'general'
+			)`, placeholders))
+		for _, tag := range includeTags {
+			args = append(args, tag)
+		}
+	}
+
+	if len(excludeTags) > 0 {
+		placeholders := strings.Repeat("?,", len(excludeTags))
+		placeholders = strings.TrimRight(placeholders, ",")
+		conditions = append(conditions, fmt.Sprintf(`
+			images.id NOT IN (
+				SELECT DISTINCT it.image_id 
+				FROM image_tags it 
+				JOIN tags t ON it.tag_id = t.id 
+				WHERE t.name IN (%s) AND t.category = 'general'
+			)`, placeholders))
+		for _, tag := range excludeTags {
+			args = append(args, tag)
 		}
 	}
 
