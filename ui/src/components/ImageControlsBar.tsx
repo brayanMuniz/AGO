@@ -10,6 +10,7 @@ interface ExportData {
 // Using FilterItem from FilterModal component
 type CharacterFilter = FilterItem;
 type TagFilter = FilterItem;
+type ExplicitnessFilter = FilterItem;
 
 interface ImageControlsBarProps {
   // Sorting controls
@@ -29,6 +30,8 @@ interface ImageControlsBarProps {
   onCharacterFiltersChange?: (filters: CharacterFilter[]) => void;
   tagFilters?: TagFilter[];
   onTagFiltersChange?: (filters: TagFilter[]) => void;
+  explicitnessFilters?: ExplicitnessFilter[];
+  onExplicitnessFiltersChange?: (filters: ExplicitnessFilter[]) => void;
   
   // Export controls
   exportData?: ExportData;
@@ -53,6 +56,8 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   onCharacterFiltersChange,
   tagFilters = [],
   onTagFiltersChange,
+  explicitnessFilters = [],
+  onExplicitnessFiltersChange,
   exportData,
   onExport,
   showSortControls = true,
@@ -65,6 +70,7 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
+  const [showExplicitnessModal, setShowExplicitnessModal] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
@@ -184,6 +190,15 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
               >
                 Tags
               </button>
+              <button
+                onClick={() => {
+                  setShowExplicitnessModal(true);
+                  setShowFilterDropdown(false);
+                }}
+                className="w-full text-left px-3 py-2 text-white text-sm hover:bg-gray-600"
+              >
+                Explicitness
+              </button>
             </div>
           )}
         </div>
@@ -267,6 +282,21 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
         excludeButtonColor="bg-red-600"
         includeButtonHoverColor="hover:bg-green-700"
         excludeButtonHoverColor="hover:bg-red-700"
+      />
+
+      {/* Explicitness Filter Modal - Using FilterModal Component */}
+      <FilterModal
+        isOpen={showExplicitnessModal}
+        onClose={() => setShowExplicitnessModal(false)}
+        title="Explicitness Filter"
+        searchPlaceholder="Search explicitness levels..."
+        apiEndpoint="/api/categories/explicitness"
+        currentFilters={explicitnessFilters}
+        onFiltersChange={onExplicitnessFiltersChange || (() => {})}
+        includeButtonColor="bg-purple-600"
+        excludeButtonColor="bg-pink-600"
+        includeButtonHoverColor="hover:bg-purple-700"
+        excludeButtonHoverColor="hover:bg-pink-700"
       />
 
       {/* Tag Filter Modal */}

@@ -57,15 +57,19 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       excludeCharacters?: string;
       includeTags?: string;
       excludeTags?: string;
+      includeExplicitness?: string;
+      excludeExplicitness?: string;
     }) => {
       const seedParam = params.seed ? `&seed=${params.seed}` : '';
       const includeCharactersParam = params.includeCharacters ? `&include_characters=${params.includeCharacters}` : '';
       const excludeCharactersParam = params.excludeCharacters ? `&exclude_characters=${params.excludeCharacters}` : '';
       const includeTagsParam = params.includeTags ? `&include_tags=${params.includeTags}` : '';
       const excludeTagsParam = params.excludeTags ? `&exclude_tags=${params.excludeTags}` : '';
+      const includeExplicitnessParam = params.includeExplicitness ? `&include_explicitness=${params.includeExplicitness}` : '';
+      const excludeExplicitnessParam = params.excludeExplicitness ? `&exclude_explicitness=${params.excludeExplicitness}` : '';
       
       const tagName = getTagName(entityName || '', entityTypeSingular);
-      return `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${params.page}&limit=${params.limit}&sort=${params.sort}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}`;
+      return `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${params.page}&limit=${params.limit}&sort=${params.sort}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}${includeExplicitnessParam}${excludeExplicitnessParam}`;
     },
     initialLoading: true,
   };

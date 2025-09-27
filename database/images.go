@@ -174,7 +174,7 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string, includeCharacters, excludeCharacters, includeTags, excludeTags []string) ([]ImageResult, int, error) {
+func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string, includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness []string) ([]ImageResult, int, error) {
 	if len(tags) == 0 {
 		return nil, 0, fmt.Errorf("no tags provided")
 	}
@@ -274,6 +274,70 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 		}
 	}
 
+	// Build explicitness filter conditions
+	var explicitnessConditions []string
+	var explicitnessArgs []any
+
+	if len(includeExplicitness) > 0 {
+		// Map user-friendly names to actual tag names
+		var ratingTags []string
+		for _, level := range includeExplicitness {
+			switch level {
+			case "general":
+				ratingTags = append(ratingTags, "rating_general")
+			case "sensitive":
+				ratingTags = append(ratingTags, "rating_sensitive")
+			case "questionable":
+				ratingTags = append(ratingTags, "rating_questionable")
+			case "explicit":
+				ratingTags = append(ratingTags, "rating_explicit")
+			}
+		}
+		if len(ratingTags) > 0 {
+			includePlaceholders := strings.TrimRight(strings.Repeat("?,", len(ratingTags)), ",")
+			explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
+				images.id IN (
+					SELECT DISTINCT it.image_id 
+					FROM image_tags it 
+					JOIN tags t ON it.tag_id = t.id 
+					WHERE t.name IN (%s) AND t.category = 'rating'
+				)`, includePlaceholders))
+			for _, tag := range ratingTags {
+				explicitnessArgs = append(explicitnessArgs, tag)
+			}
+		}
+	}
+
+	if len(excludeExplicitness) > 0 {
+		// Map user-friendly names to actual tag names
+		var ratingTags []string
+		for _, level := range excludeExplicitness {
+			switch level {
+			case "general":
+				ratingTags = append(ratingTags, "rating_general")
+			case "sensitive":
+				ratingTags = append(ratingTags, "rating_sensitive")
+			case "questionable":
+				ratingTags = append(ratingTags, "rating_questionable")
+			case "explicit":
+				ratingTags = append(ratingTags, "rating_explicit")
+			}
+		}
+		if len(ratingTags) > 0 {
+			excludePlaceholders := strings.TrimRight(strings.Repeat("?,", len(ratingTags)), ",")
+			explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
+				images.id NOT IN (
+					SELECT DISTINCT it.image_id 
+					FROM image_tags it 
+					JOIN tags t ON it.tag_id = t.id 
+					WHERE t.name IN (%s) AND t.category = 'rating'
+				)`, excludePlaceholders))
+			for _, tag := range ratingTags {
+				explicitnessArgs = append(explicitnessArgs, tag)
+			}
+		}
+	}
+
 	// Combine all filter conditions
 	var allConditions []string
 	var allFilterArgs []any
@@ -285,6 +349,10 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 	if len(tagConditions) > 0 {
 		allConditions = append(allConditions, tagConditions...)
 		allFilterArgs = append(allFilterArgs, tagArgs...)
+	}
+	if len(explicitnessConditions) > 0 {
+		allConditions = append(allConditions, explicitnessConditions...)
+		allFilterArgs = append(allFilterArgs, explicitnessArgs...)
 	}
 
 	filterWhereClause := ""

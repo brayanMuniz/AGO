@@ -27,6 +27,8 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		excludeCharacters := c.DefaultQuery("exclude_characters", "")
 		includeTags := c.DefaultQuery("include_tags", "")
 		excludeTags := c.DefaultQuery("exclude_tags", "")
+		includeExplicitness := c.DefaultQuery("include_explicitness", "")
+		excludeExplicitness := c.DefaultQuery("exclude_explicitness", "")
 
 		if page < 1 {
 			page = 1
@@ -68,7 +70,7 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 		var queryArgs []interface{}
 		var countArgs []interface{}
 
-		if includeCharacters != "" || excludeCharacters != "" || includeTags != "" || excludeTags != "" {
+		if includeCharacters != "" || excludeCharacters != "" || includeTags != "" || excludeTags != "" || includeExplicitness != "" || excludeExplicitness != "" {
 			var conditions []string
 			
 			if includeCharacters != "" {
@@ -141,6 +143,76 @@ func GetImagesHandler(db *sql.DB) gin.HandlerFunc {
 						JOIN tags t ON it.tag_id = t.id 
 						WHERE t.name IN (%s) AND t.category = 'general'
 					)`, strings.Join(placeholders, ",")))
+			}
+			
+			if includeExplicitness != "" {
+				// Images must have at least one of the included explicitness levels
+				explicitness := strings.Split(includeExplicitness, ",")
+				// Map user-friendly names to actual tag names
+				var ratingTags []string
+				for _, level := range explicitness {
+					level = strings.TrimSpace(level)
+					switch level {
+					case "general":
+						ratingTags = append(ratingTags, "rating_general")
+					case "sensitive":
+						ratingTags = append(ratingTags, "rating_sensitive")
+					case "questionable":
+						ratingTags = append(ratingTags, "rating_questionable")
+					case "explicit":
+						ratingTags = append(ratingTags, "rating_explicit")
+					}
+				}
+				if len(ratingTags) > 0 {
+					placeholders := make([]string, len(ratingTags))
+					for i, tag := range ratingTags {
+						placeholders[i] = "?"
+						queryArgs = append(queryArgs, tag)
+						countArgs = append(countArgs, tag)
+					}
+					conditions = append(conditions, fmt.Sprintf(`
+						images.id IN (
+							SELECT DISTINCT it.image_id 
+							FROM image_tags it 
+							JOIN tags t ON it.tag_id = t.id 
+							WHERE t.name IN (%s) AND t.category = 'rating'
+						)`, strings.Join(placeholders, ",")))
+				}
+			}
+			
+			if excludeExplicitness != "" {
+				// Images must NOT have any of the excluded explicitness levels
+				explicitness := strings.Split(excludeExplicitness, ",")
+				// Map user-friendly names to actual tag names
+				var ratingTags []string
+				for _, level := range explicitness {
+					level = strings.TrimSpace(level)
+					switch level {
+					case "general":
+						ratingTags = append(ratingTags, "rating_general")
+					case "sensitive":
+						ratingTags = append(ratingTags, "rating_sensitive")
+					case "questionable":
+						ratingTags = append(ratingTags, "rating_questionable")
+					case "explicit":
+						ratingTags = append(ratingTags, "rating_explicit")
+					}
+				}
+				if len(ratingTags) > 0 {
+					placeholders := make([]string, len(ratingTags))
+					for i, tag := range ratingTags {
+						placeholders[i] = "?"
+						queryArgs = append(queryArgs, tag)
+						countArgs = append(countArgs, tag)
+					}
+					conditions = append(conditions, fmt.Sprintf(`
+						images.id NOT IN (
+							SELECT DISTINCT it.image_id 
+							FROM image_tags it 
+							JOIN tags t ON it.tag_id = t.id 
+							WHERE t.name IN (%s) AND t.category = 'rating'
+						)`, strings.Join(placeholders, ",")))
+				}
 			}
 			
 			whereClause = "WHERE " + strings.Join(conditions, " AND ")
@@ -239,6 +311,8 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		excludeCharacters := ctx.DefaultQuery("exclude_characters", "")
 		includeTags := ctx.DefaultQuery("include_tags", "")
 		excludeTags := ctx.DefaultQuery("exclude_tags", "")
+		includeExplicitness := ctx.DefaultQuery("include_explicitness", "")
+		excludeExplicitness := ctx.DefaultQuery("exclude_explicitness", "")
 
 		if page < 1 {
 			page = 1
@@ -282,8 +356,23 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 			}
 		}
 
+		// Parse explicitness filters
+		var includeExplicitnessList, excludeExplicitnessList []string
+		if includeExplicitness != "" {
+			includeExplicitnessList = strings.Split(includeExplicitness, ",")
+			for i := range includeExplicitnessList {
+				includeExplicitnessList[i] = strings.TrimSpace(includeExplicitnessList[i])
+			}
+		}
+		if excludeExplicitness != "" {
+			excludeExplicitnessList = strings.Split(excludeExplicitness, ",")
+			for i := range excludeExplicitnessList {
+				excludeExplicitnessList[i] = strings.TrimSpace(excludeExplicitnessList[i])
+			}
+		}
+
 		// Get paginated results
-		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy, seed, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList)
+		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, page, limit, sortBy, seed, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": err.Error()})
 			return

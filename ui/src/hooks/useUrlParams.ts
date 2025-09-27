@@ -15,6 +15,8 @@ export interface UrlParams {
   excludeCharacters?: string[]; // Character names to exclude
   includeTags?: string[]; // Tag names to include
   excludeTags?: string[]; // Tag names to exclude
+  includeExplicitness?: string[]; // Explicitness levels to include (general, sensitive, questionable, explicit)
+  excludeExplicitness?: string[]; // Explicitness levels to exclude
 }
 
 const DEFAULT_PARAMS: UrlParams = {
@@ -64,6 +66,10 @@ export const useUrlParams = () => {
     // Parse tag filters
     const includeTags = searchParams.get('include_tags')?.split(',').filter(Boolean) || undefined;
     const excludeTags = searchParams.get('exclude_tags')?.split(',').filter(Boolean) || undefined;
+    
+    // Parse explicitness filters
+    const includeExplicitness = searchParams.get('include_explicitness')?.split(',').filter(Boolean) || undefined;
+    const excludeExplicitness = searchParams.get('exclude_explicitness')?.split(',').filter(Boolean) || undefined;
 
     // Validate parameters - handle both user-friendly and backend parameter names
     let validSortBy: SortBy;
@@ -92,7 +98,9 @@ export const useUrlParams = () => {
       includeCharacters,
       excludeCharacters,
       includeTags,
-      excludeTags
+      excludeTags,
+      includeExplicitness,
+      excludeExplicitness
     };
   }, [searchParams]);
 
@@ -144,6 +152,16 @@ export const useUrlParams = () => {
     } else if (updatedParams.excludeTags !== undefined) {
       newSearchParams.delete('exclude_tags');
     }
+    if (updatedParams.includeExplicitness && updatedParams.includeExplicitness.length > 0) {
+      newSearchParams.set('include_explicitness', updatedParams.includeExplicitness.join(','));
+    } else if (updatedParams.includeExplicitness !== undefined) {
+      newSearchParams.delete('include_explicitness');
+    }
+    if (updatedParams.excludeExplicitness && updatedParams.excludeExplicitness.length > 0) {
+      newSearchParams.set('exclude_explicitness', updatedParams.excludeExplicitness.join(','));
+    } else if (updatedParams.excludeExplicitness !== undefined) {
+      newSearchParams.delete('exclude_explicitness');
+    }
 
     setSearchParams(newSearchParams, { replace: true });
   }, [getCurrentParams, setSearchParams]);
@@ -180,6 +198,10 @@ export const useUrlParams = () => {
     updateParams({ includeTags, excludeTags });
   }, [updateParams]);
 
+  const setExplicitnessFilters = useCallback((includeExplicitness?: string[], excludeExplicitness?: string[]) => {
+    updateParams({ includeExplicitness, excludeExplicitness });
+  }, [updateParams]);
+
   // Handle backend parameter changes from ImageControlsBar
   const handleBackendSortChange = useCallback((backendSort: string) => {
     const userFriendlySort = REVERSE_SORT_MAP[backendSort];
@@ -202,6 +224,8 @@ export const useUrlParams = () => {
     excludeCharacters: params.excludeCharacters,
     includeTags: params.includeTags,
     excludeTags: params.excludeTags,
+    includeExplicitness: params.includeExplicitness,
+    excludeExplicitness: params.excludeExplicitness,
     
     // Backend values for components that expect them
     backendSortBy: getBackendSortValue(params.sortBy),
@@ -213,6 +237,7 @@ export const useUrlParams = () => {
     setPage,
     setCharacterFilters,
     setTagFilters,
+    setExplicitnessFilters,
     updateParams,
     handleBackendSortChange,
     

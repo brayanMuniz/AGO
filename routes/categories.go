@@ -16,6 +16,7 @@ func RegisterCategoriesRoute(r *gin.RouterGroup, db *sql.DB) {
 	categoryGroup.GET("/characters", categoryHandler(db, "character"))
 	categoryGroup.GET("/artists", categoryHandler(db, "artist"))
 	categoryGroup.GET("/ratings", ratingsHandler())
+	categoryGroup.GET("/explicitness", explicitnessHandler())
 	
 	// Get tag info by name
 	categoryGroup.GET("/tag/:name", getTagByNameHandler(db))
@@ -45,6 +46,19 @@ func ratingsHandler() gin.HandlerFunc {
 			{"id": 4, "name": "explicit", "category": "rating"},
 		}
 		ctx.JSON(200, gin.H{"tags": ratings})
+	}
+}
+
+func explicitnessHandler() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		// Return explicitness levels for filtering
+		explicitness := []map[string]interface{}{
+			{"id": 1, "name": "general", "category": "rating"},
+			{"id": 2, "name": "sensitive", "category": "rating"},
+			{"id": 3, "name": "questionable", "category": "rating"},
+			{"id": 4, "name": "explicit", "category": "rating"},
+		}
+		ctx.JSON(200, gin.H{"tags": explicitness})
 	}
 }
 

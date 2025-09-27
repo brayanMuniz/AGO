@@ -57,6 +57,8 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		excludeCharacters := c.DefaultQuery("exclude_characters", "")
 		includeTags := c.DefaultQuery("include_tags", "")
 		excludeTags := c.DefaultQuery("exclude_tags", "")
+		includeExplicitness := c.DefaultQuery("include_explicitness", "")
+		excludeExplicitness := c.DefaultQuery("exclude_explicitness", "")
 
 		if page < 1 {
 			page = 1
@@ -149,6 +151,76 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 				)`, strings.Join(placeholders, ",")))
 		}
 
+		// Build explicitness filter conditions (rating tags)
+		var explicitnessConditions []string
+		var explicitnessArgs []interface{}
+
+		if includeExplicitness != "" {
+			explicitness := strings.Split(includeExplicitness, ",")
+			// Map user-friendly names to actual tag names
+			var ratingTags []string
+			for _, level := range explicitness {
+				level = strings.TrimSpace(level)
+				switch level {
+				case "general":
+					ratingTags = append(ratingTags, "rating_general")
+				case "sensitive":
+					ratingTags = append(ratingTags, "rating_sensitive")
+				case "questionable":
+					ratingTags = append(ratingTags, "rating_questionable")
+				case "explicit":
+					ratingTags = append(ratingTags, "rating_explicit")
+				}
+			}
+			if len(ratingTags) > 0 {
+				placeholders := make([]string, len(ratingTags))
+				for i, tag := range ratingTags {
+					placeholders[i] = "?"
+					explicitnessArgs = append(explicitnessArgs, tag)
+				}
+				explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
+					images.id IN (
+						SELECT DISTINCT it.image_id 
+						FROM image_tags it 
+						JOIN tags t ON it.tag_id = t.id 
+						WHERE t.name IN (%s) AND t.category = 'rating'
+					)`, strings.Join(placeholders, ",")))
+			}
+		}
+
+		if excludeExplicitness != "" {
+			explicitness := strings.Split(excludeExplicitness, ",")
+			// Map user-friendly names to actual tag names
+			var ratingTags []string
+			for _, level := range explicitness {
+				level = strings.TrimSpace(level)
+				switch level {
+				case "general":
+					ratingTags = append(ratingTags, "rating_general")
+				case "sensitive":
+					ratingTags = append(ratingTags, "rating_sensitive")
+				case "questionable":
+					ratingTags = append(ratingTags, "rating_questionable")
+				case "explicit":
+					ratingTags = append(ratingTags, "rating_explicit")
+				}
+			}
+			if len(ratingTags) > 0 {
+				placeholders := make([]string, len(ratingTags))
+				for i, tag := range ratingTags {
+					placeholders[i] = "?"
+					explicitnessArgs = append(explicitnessArgs, tag)
+				}
+				explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
+					images.id NOT IN (
+						SELECT DISTINCT it.image_id 
+						FROM image_tags it 
+						JOIN tags t ON it.tag_id = t.id 
+						WHERE t.name IN (%s) AND t.category = 'rating'
+					)`, strings.Join(placeholders, ",")))
+			}
+		}
+
 		// Combine all filter conditions
 		var allConditions []string
 		var allFilterArgs []interface{}
@@ -160,6 +232,10 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		if len(tagConditions) > 0 {
 			allConditions = append(allConditions, tagConditions...)
 			allFilterArgs = append(allFilterArgs, tagArgs...)
+		}
+		if len(explicitnessConditions) > 0 {
+			allConditions = append(allConditions, explicitnessConditions...)
+			allFilterArgs = append(allFilterArgs, explicitnessArgs...)
 		}
 
 		filterWhereClause := ""
@@ -275,7 +351,22 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 				}
 			}
 			
-			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, page, limit, sortBy, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList)
+			// Parse explicitness filters for smart albums
+			var includeExplicitnessList, excludeExplicitnessList []string
+			if includeExplicitness != "" {
+				includeExplicitnessList = strings.Split(includeExplicitness, ",")
+				for i := range includeExplicitnessList {
+					includeExplicitnessList[i] = strings.TrimSpace(includeExplicitnessList[i])
+				}
+			}
+			if excludeExplicitness != "" {
+				excludeExplicitnessList = strings.Split(excludeExplicitness, ",")
+				for i := range excludeExplicitnessList {
+					excludeExplicitnessList[i] = strings.TrimSpace(excludeExplicitnessList[i])
+				}
+			}
+			
+			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, page, limit, sortBy, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return

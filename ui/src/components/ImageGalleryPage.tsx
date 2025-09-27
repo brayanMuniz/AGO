@@ -46,17 +46,22 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
     excludeCharacters,
     includeTags,
     excludeTags,
+    includeExplicitness,
+    excludeExplicitness,
     handleSortChange,
     handleItemsPerPageChange,
     handleImageSizeChange,
     setPage,
     handleRemoveCharacterFilter,
     handleRemoveTagFilter,
+    handleRemoveExplicitnessFilter,
     handleClearAllFilters,
     characterFilters,
     onCharacterFiltersChange,
     tagFilters,
     onTagFiltersChange,
+    explicitnessFilters,
+    onExplicitnessFiltersChange,
   } = useImageGallery(config);
 
   return (
@@ -76,6 +81,8 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
         onCharacterFiltersChange={onCharacterFiltersChange}
         tagFilters={tagFilters}
         onTagFiltersChange={onTagFiltersChange}
+        explicitnessFilters={explicitnessFilters}
+        onExplicitnessFiltersChange={onExplicitnessFiltersChange}
         exportData={exportData}
         onExport={onExport}
         showExportControls={showExportControls}
@@ -87,8 +94,11 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
         excludeCharacters={excludeCharacters}
         includeTags={includeTags}
         excludeTags={excludeTags}
+        includeExplicitness={includeExplicitness}
+        excludeExplicitness={excludeExplicitness}
         onRemoveCharacterFilter={handleRemoveCharacterFilter}
         onRemoveTagFilter={handleRemoveTagFilter}
+        onRemoveExplicitnessFilter={handleRemoveExplicitnessFilter}
         onClearAllFilters={handleClearAllFilters}
       />
 

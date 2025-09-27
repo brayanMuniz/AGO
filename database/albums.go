@@ -137,7 +137,7 @@ func GetSmartAlbumImages(db *sql.DB, albumID int) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sortBy string, includeCharacters, excludeCharacters, includeTags, excludeTags []string) ([]ImageResult, int, error) {
+func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sortBy string, includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness []string) ([]ImageResult, int, error) {
 	var includeTagCSV, excludeTagCSV, includeAlbumCSV, excludeAlbumCSV string
 	var minRating int
 	var favoriteOnly bool
@@ -246,6 +246,69 @@ func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sort
 			)`, placeholders))
 		for _, tag := range excludeTags {
 			args = append(args, tag)
+		}
+	}
+
+	// Add explicitness filtering conditions (rating tags)
+	if len(includeExplicitness) > 0 {
+		// Map user-friendly names to actual tag names
+		var ratingTags []string
+		for _, level := range includeExplicitness {
+			switch level {
+			case "general":
+				ratingTags = append(ratingTags, "rating_general")
+			case "sensitive":
+				ratingTags = append(ratingTags, "rating_sensitive")
+			case "questionable":
+				ratingTags = append(ratingTags, "rating_questionable")
+			case "explicit":
+				ratingTags = append(ratingTags, "rating_explicit")
+			}
+		}
+		if len(ratingTags) > 0 {
+			placeholders := strings.Repeat("?,", len(ratingTags))
+			placeholders = strings.TrimRight(placeholders, ",")
+			conditions = append(conditions, fmt.Sprintf(`
+				images.id IN (
+					SELECT DISTINCT it.image_id 
+					FROM image_tags it 
+					JOIN tags t ON it.tag_id = t.id 
+					WHERE t.name IN (%s) AND t.category = 'rating'
+				)`, placeholders))
+			for _, tag := range ratingTags {
+				args = append(args, tag)
+			}
+		}
+	}
+
+	if len(excludeExplicitness) > 0 {
+		// Map user-friendly names to actual tag names
+		var ratingTags []string
+		for _, level := range excludeExplicitness {
+			switch level {
+			case "general":
+				ratingTags = append(ratingTags, "rating_general")
+			case "sensitive":
+				ratingTags = append(ratingTags, "rating_sensitive")
+			case "questionable":
+				ratingTags = append(ratingTags, "rating_questionable")
+			case "explicit":
+				ratingTags = append(ratingTags, "rating_explicit")
+			}
+		}
+		if len(ratingTags) > 0 {
+			placeholders := strings.Repeat("?,", len(ratingTags))
+			placeholders = strings.TrimRight(placeholders, ",")
+			conditions = append(conditions, fmt.Sprintf(`
+				images.id NOT IN (
+					SELECT DISTINCT it.image_id 
+					FROM image_tags it 
+					JOIN tags t ON it.tag_id = t.id 
+					WHERE t.name IN (%s) AND t.category = 'rating'
+				)`, placeholders))
+			for _, tag := range ratingTags {
+				args = append(args, tag)
+			}
 		}
 	}
 

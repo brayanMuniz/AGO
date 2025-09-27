@@ -5,8 +5,11 @@ interface FilterDisplayProps {
   excludeCharacters?: string[];
   includeTags?: string[];
   excludeTags?: string[];
+  includeExplicitness?: string[];
+  excludeExplicitness?: string[];
   onRemoveCharacterFilter?: (characterName: string, type: 'include' | 'exclude') => void;
   onRemoveTagFilter?: (tagName: string, type: 'include' | 'exclude') => void;
+  onRemoveExplicitnessFilter?: (explicitnessLevel: string, type: 'include' | 'exclude') => void;
   onClearAllFilters?: () => void;
 }
 
@@ -15,12 +18,16 @@ const FilterDisplay: React.FC<FilterDisplayProps> = ({
   excludeCharacters = [],
   includeTags = [],
   excludeTags = [],
+  includeExplicitness = [],
+  excludeExplicitness = [],
   onRemoveCharacterFilter,
   onRemoveTagFilter,
+  onRemoveExplicitnessFilter,
   onClearAllFilters,
 }) => {
   const hasFilters = includeCharacters.length > 0 || excludeCharacters.length > 0 || 
-                     includeTags.length > 0 || excludeTags.length > 0;
+                     includeTags.length > 0 || excludeTags.length > 0 ||
+                     includeExplicitness.length > 0 || excludeExplicitness.length > 0;
 
   if (!hasFilters) {
     return null;
@@ -105,6 +112,42 @@ const FilterDisplay: React.FC<FilterDisplayProps> = ({
             {onRemoveTagFilter && (
               <button
                 onClick={() => onRemoveTagFilter(tag, 'exclude')}
+                className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+
+        {/* Include Explicitness Filters */}
+        {includeExplicitness.map((level) => (
+          <span
+            key={`include-explicitness-${level}`}
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 bg-purple-600 text-white"
+          >
+            Include: {level}
+            {onRemoveExplicitnessFilter && (
+              <button
+                onClick={() => onRemoveExplicitnessFilter(level, 'include')}
+                className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+
+        {/* Exclude Explicitness Filters */}
+        {excludeExplicitness.map((level) => (
+          <span
+            key={`exclude-explicitness-${level}`}
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 bg-pink-600 text-white"
+          >
+            Exclude: {level}
+            {onRemoveExplicitnessFilter && (
+              <button
+                onClick={() => onRemoveExplicitnessFilter(level, 'exclude')}
                 className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
               >
                 ×

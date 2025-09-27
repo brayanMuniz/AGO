@@ -84,16 +84,19 @@ const AlbumDetailPage: React.FC = () => {
     imageSize, 
     page, 
     seed, 
-    includeCharacters, 
+    includeCharacters,
     excludeCharacters,
     includeTags,
     excludeTags,
+    includeExplicitness,
+    excludeExplicitness,
     backendSortBy, 
     setPerPage: setItemsPerPage, 
     setImageSize, 
     setPage, 
     setCharacterFilters,
     setTagFilters,
+    setExplicitnessFilters,
     getBackendSortValue, 
     handleBackendSortChange 
   } = useUrlParams();
@@ -127,9 +130,20 @@ const AlbumDetailPage: React.FC = () => {
     }
   };
 
+  const handleRemoveExplicitnessFilter = (explicitnessLevel: string, type: 'include' | 'exclude') => {
+    if (type === 'include') {
+      const newInclude = includeExplicitness?.filter(level => level !== explicitnessLevel) || [];
+      setExplicitnessFilters(newInclude.length > 0 ? newInclude : undefined, excludeExplicitness);
+    } else {
+      const newExclude = excludeExplicitness?.filter(level => level !== explicitnessLevel) || [];
+      setExplicitnessFilters(includeExplicitness, newExclude.length > 0 ? newExclude : undefined);
+    }
+  };
+
   const handleClearAllFilters = () => {
     setCharacterFilters(undefined, undefined);
     setTagFilters(undefined, undefined);
+    setExplicitnessFilters(undefined, undefined);
   };
 
   const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
@@ -326,8 +340,12 @@ const AlbumDetailPage: React.FC = () => {
         ? `&include_tags=${includeTags.join(',')}` : '';
       const excludeTagsParam = excludeTags && excludeTags.length > 0 
         ? `&exclude_tags=${excludeTags.join(',')}` : '';
+      const includeExplicitnessParam = includeExplicitness && includeExplicitness.length > 0 
+        ? `&include_explicitness=${includeExplicitness.join(',')}` : '';
+      const excludeExplicitnessParam = excludeExplicitness && excludeExplicitness.length > 0 
+        ? `&exclude_explicitness=${excludeExplicitness.join(',')}` : '';
       
-      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}`;
+      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}${includeExplicitnessParam}${excludeExplicitnessParam}`;
       const imagesResponse = await fetch(url);
       if (!imagesResponse.ok) {
         throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);
@@ -362,7 +380,7 @@ const AlbumDetailPage: React.FC = () => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [id, sortBy, itemsPerPage, page, includeCharacters?.join(','), excludeCharacters?.join(','), includeTags?.join(','), excludeTags?.join(',')]);
+  }, [id, sortBy, itemsPerPage, page, includeCharacters?.join(','), excludeCharacters?.join(','), includeTags?.join(','), excludeTags?.join(','), includeExplicitness?.join(','), excludeExplicitness?.join(',')]);
 
   const fetchAllTags = async () => {
     if (allTags.length > 0) return;
@@ -878,6 +896,18 @@ const AlbumDetailPage: React.FC = () => {
                 exclude.length > 0 ? exclude : undefined
               );
             }}
+            explicitnessFilters={[
+              ...(includeExplicitness || []).map(level => ({ id: 0, name: level, type: 'include' as const })),
+              ...(excludeExplicitness || []).map(level => ({ id: 0, name: level, type: 'exclude' as const }))
+            ]}
+            onExplicitnessFiltersChange={(filters) => {
+              const include = filters.filter(f => f.type === 'include').map(f => f.name);
+              const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+              setExplicitnessFilters(
+                include.length > 0 ? include : undefined,
+                exclude.length > 0 ? exclude : undefined
+              );
+            }}
             exportData={album ? {
               images: images.map(img => img.id),
               exportName: album.name,
@@ -892,8 +922,11 @@ const AlbumDetailPage: React.FC = () => {
             excludeCharacters={excludeCharacters}
             includeTags={includeTags}
             excludeTags={excludeTags}
+            includeExplicitness={includeExplicitness}
+            excludeExplicitness={excludeExplicitness}
             onRemoveCharacterFilter={handleRemoveCharacterFilter}
             onRemoveTagFilter={handleRemoveTagFilter}
+            onRemoveExplicitnessFilter={handleRemoveExplicitnessFilter}
             onClearAllFilters={handleClearAllFilters}
           />
 
