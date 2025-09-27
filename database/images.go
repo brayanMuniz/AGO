@@ -212,130 +212,42 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 	// Create placeholders for IN clause
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(tags)), ",")
 
-	// Build character filter conditions
-	var characterConditions []string
-	var characterArgs []any
-
-	if len(includeCharacters) > 0 {
-		includePlaceholders := strings.TrimRight(strings.Repeat("?,", len(includeCharacters)), ",")
-		characterConditions = append(characterConditions, fmt.Sprintf(`
-			images.id IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'character'
-			)`, includePlaceholders))
-		for _, char := range includeCharacters {
-			characterArgs = append(characterArgs, char)
-		}
-	}
-
-	if len(excludeCharacters) > 0 {
-		excludePlaceholders := strings.TrimRight(strings.Repeat("?,", len(excludeCharacters)), ",")
-		characterConditions = append(characterConditions, fmt.Sprintf(`
-			images.id NOT IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'character'
-			)`, excludePlaceholders))
-		for _, char := range excludeCharacters {
-			characterArgs = append(characterArgs, char)
-		}
-	}
-
-	// Build tag filter conditions
-	var tagConditions []string
-	var tagArgs []any
-
-	if len(includeTags) > 0 {
-		includePlaceholders := strings.TrimRight(strings.Repeat("?,", len(includeTags)), ",")
-		tagConditions = append(tagConditions, fmt.Sprintf(`
-			images.id IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'general'
-			)`, includePlaceholders))
-		for _, tag := range includeTags {
-			tagArgs = append(tagArgs, tag)
-		}
-	}
-
-	if len(excludeTags) > 0 {
-		excludePlaceholders := strings.TrimRight(strings.Repeat("?,", len(excludeTags)), ",")
-		tagConditions = append(tagConditions, fmt.Sprintf(`
-			images.id NOT IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'general'
-			)`, excludePlaceholders))
-		for _, tag := range excludeTags {
-			tagArgs = append(tagArgs, tag)
-		}
-	}
-
-	// Build explicitness filter conditions
-	var explicitnessConditions []string
-	var explicitnessArgs []any
-
-	if len(includeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names using shared utility
-		ratingTags := utils.MapExplicitnessToTags(includeExplicitness)
-		if len(ratingTags) > 0 {
-			includePlaceholders := strings.TrimRight(strings.Repeat("?,", len(ratingTags)), ",")
-			explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
-				images.id IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'rating'
-				)`, includePlaceholders))
-			for _, tag := range ratingTags {
-				explicitnessArgs = append(explicitnessArgs, tag)
-			}
-		}
-	}
-
-	if len(excludeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names using shared utility
-		ratingTags := utils.MapExplicitnessToTags(excludeExplicitness)
-		if len(ratingTags) > 0 {
-			excludePlaceholders := strings.TrimRight(strings.Repeat("?,", len(ratingTags)), ",")
-			explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
-				images.id NOT IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'rating'
-				)`, excludePlaceholders))
-			for _, tag := range ratingTags {
-				explicitnessArgs = append(explicitnessArgs, tag)
-			}
-		}
-	}
-
-	// Combine all filter conditions
-	var allConditions []string
-	var allFilterArgs []any
+	// Build filter conditions using shared utilities
+	var filterConditions []utils.FilterCondition
 	
-	if len(characterConditions) > 0 {
-		allConditions = append(allConditions, characterConditions...)
-		allFilterArgs = append(allFilterArgs, characterArgs...)
+	// Character filters
+	if len(includeCharacters) > 0 {
+		filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(includeCharacters, true))
 	}
-	if len(tagConditions) > 0 {
-		allConditions = append(allConditions, tagConditions...)
-		allFilterArgs = append(allFilterArgs, tagArgs...)
+	if len(excludeCharacters) > 0 {
+		filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(excludeCharacters, false))
 	}
-	if len(explicitnessConditions) > 0 {
-		allConditions = append(allConditions, explicitnessConditions...)
-		allFilterArgs = append(allFilterArgs, explicitnessArgs...)
+	
+	// Tag filters
+	if len(includeTags) > 0 {
+		filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(includeTags, true))
 	}
-
-	filterWhereClause := ""
-	if len(allConditions) > 0 {
-		filterWhereClause = " AND " + strings.Join(allConditions, " AND ")
+	if len(excludeTags) > 0 {
+		filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(excludeTags, false))
+	}
+	
+	// Explicitness filters
+	if len(includeExplicitness) > 0 {
+		filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(includeExplicitness, true))
+	}
+	if len(excludeExplicitness) > 0 {
+		filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(excludeExplicitness, false))
+	}
+	
+	// Combine filter conditions
+	var filterWhereClause string
+	var allFilterArgs []any
+	if len(filterConditions) > 0 {
+		whereClause, args := utils.CombineFilterConditions(filterConditions)
+		if whereClause != "" {
+			filterWhereClause = " AND " + strings.TrimPrefix(whereClause, "WHERE ")
+			allFilterArgs = args
+		}
 	}
 
 	// Get total count first

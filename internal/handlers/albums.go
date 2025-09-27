@@ -81,150 +81,66 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		var images []database.ImageResult
 		var totalCount int
 
-		// Build character filter conditions
-		var characterConditions []string
-		var characterArgs []interface{}
-
+		// Build filter conditions using shared utilities
+		var filterConditions []utils.FilterCondition
+		
+		// Character filters
 		if includeCharacters != "" {
 			characters := strings.Split(includeCharacters, ",")
-			placeholders := make([]string, len(characters))
-			for i, char := range characters {
-				placeholders[i] = "?"
-				characterArgs = append(characterArgs, strings.TrimSpace(char))
+			for i := range characters {
+				characters[i] = strings.TrimSpace(characters[i])
 			}
-			characterConditions = append(characterConditions, fmt.Sprintf(`
-				images.id IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'character'
-				)`, strings.Join(placeholders, ",")))
+			filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(characters, true))
 		}
-
 		if excludeCharacters != "" {
 			characters := strings.Split(excludeCharacters, ",")
-			placeholders := make([]string, len(characters))
-			for i, char := range characters {
-				placeholders[i] = "?"
-				characterArgs = append(characterArgs, strings.TrimSpace(char))
+			for i := range characters {
+				characters[i] = strings.TrimSpace(characters[i])
 			}
-			characterConditions = append(characterConditions, fmt.Sprintf(`
-				images.id NOT IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'character'
-				)`, strings.Join(placeholders, ",")))
+			filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(characters, false))
 		}
-
-		// Build tag filter conditions
-		var tagConditions []string
-		var tagArgs []interface{}
-
+		
+		// Tag filters
 		if includeTags != "" {
 			tags := strings.Split(includeTags, ",")
-			placeholders := make([]string, len(tags))
-			for i, tag := range tags {
-				placeholders[i] = "?"
-				tagArgs = append(tagArgs, strings.TrimSpace(tag))
+			for i := range tags {
+				tags[i] = strings.TrimSpace(tags[i])
 			}
-			tagConditions = append(tagConditions, fmt.Sprintf(`
-				images.id IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'general'
-				)`, strings.Join(placeholders, ",")))
+			filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(tags, true))
 		}
-
 		if excludeTags != "" {
 			tags := strings.Split(excludeTags, ",")
-			placeholders := make([]string, len(tags))
-			for i, tag := range tags {
-				placeholders[i] = "?"
-				tagArgs = append(tagArgs, strings.TrimSpace(tag))
+			for i := range tags {
+				tags[i] = strings.TrimSpace(tags[i])
 			}
-			tagConditions = append(tagConditions, fmt.Sprintf(`
-				images.id NOT IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'general'
-				)`, strings.Join(placeholders, ",")))
+			filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(tags, false))
 		}
-
-		// Build explicitness filter conditions (rating tags)
-		var explicitnessConditions []string
-		var explicitnessArgs []interface{}
-
+		
+		// Explicitness filters
 		if includeExplicitness != "" {
 			explicitness := strings.Split(includeExplicitness, ",")
-			// Trim whitespace from each level
 			for i := range explicitness {
 				explicitness[i] = strings.TrimSpace(explicitness[i])
 			}
-			// Map user-friendly names to actual tag names using shared utility
-			ratingTags := utils.MapExplicitnessToTags(explicitness)
-			if len(ratingTags) > 0 {
-				placeholders := make([]string, len(ratingTags))
-				for i, tag := range ratingTags {
-					placeholders[i] = "?"
-					explicitnessArgs = append(explicitnessArgs, tag)
-				}
-				explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
-					images.id IN (
-						SELECT DISTINCT it.image_id 
-						FROM image_tags it 
-						JOIN tags t ON it.tag_id = t.id 
-						WHERE t.name IN (%s) AND t.category = 'rating'
-					)`, strings.Join(placeholders, ",")))
-			}
+			filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(explicitness, true))
 		}
-
 		if excludeExplicitness != "" {
 			explicitness := strings.Split(excludeExplicitness, ",")
-			// Trim whitespace from each level
 			for i := range explicitness {
 				explicitness[i] = strings.TrimSpace(explicitness[i])
 			}
-			// Map user-friendly names to actual tag names using shared utility
-			ratingTags := utils.MapExplicitnessToTags(explicitness)
-			if len(ratingTags) > 0 {
-				placeholders := make([]string, len(ratingTags))
-				for i, tag := range ratingTags {
-					placeholders[i] = "?"
-					explicitnessArgs = append(explicitnessArgs, tag)
-				}
-				explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
-					images.id NOT IN (
-						SELECT DISTINCT it.image_id 
-						FROM image_tags it 
-						JOIN tags t ON it.tag_id = t.id 
-						WHERE t.name IN (%s) AND t.category = 'rating'
-					)`, strings.Join(placeholders, ",")))
-			}
+			filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(explicitness, false))
 		}
-
-		// Combine all filter conditions
-		var allConditions []string
-		var allFilterArgs []interface{}
 		
-		if len(characterConditions) > 0 {
-			allConditions = append(allConditions, characterConditions...)
-			allFilterArgs = append(allFilterArgs, characterArgs...)
-		}
-		if len(tagConditions) > 0 {
-			allConditions = append(allConditions, tagConditions...)
-			allFilterArgs = append(allFilterArgs, tagArgs...)
-		}
-		if len(explicitnessConditions) > 0 {
-			allConditions = append(allConditions, explicitnessConditions...)
-			allFilterArgs = append(allFilterArgs, explicitnessArgs...)
-		}
-
-		filterWhereClause := ""
-		if len(allConditions) > 0 {
-			filterWhereClause = " AND " + strings.Join(allConditions, " AND ")
+		// Combine filter conditions
+		var filterWhereClause string
+		var allFilterArgs []interface{}
+		if len(filterConditions) > 0 {
+			whereClause, args := utils.CombineFilterConditions(filterConditions)
+			if whereClause != "" {
+				filterWhereClause = " AND " + strings.TrimPrefix(whereClause, "WHERE ")
+				allFilterArgs = args
+			}
 		}
 
 		// Build order by clause

@@ -189,104 +189,42 @@ func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sort
 	conditions := []string{}
 	args := []any{}
 
-	// Add character filtering conditions
+	// Build filter conditions using shared utilities
+	var filterConditions []utils.FilterCondition
+	
+	// Character filters
 	if len(includeCharacters) > 0 {
-		placeholders := strings.Repeat("?,", len(includeCharacters))
-		placeholders = strings.TrimRight(placeholders, ",")
-		conditions = append(conditions, fmt.Sprintf(`
-			images.id IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'character'
-			)`, placeholders))
-		for _, char := range includeCharacters {
-			args = append(args, char)
-		}
+		filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(includeCharacters, true))
 	}
-
 	if len(excludeCharacters) > 0 {
-		placeholders := strings.Repeat("?,", len(excludeCharacters))
-		placeholders = strings.TrimRight(placeholders, ",")
-		conditions = append(conditions, fmt.Sprintf(`
-			images.id NOT IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'character'
-			)`, placeholders))
-		for _, char := range excludeCharacters {
-			args = append(args, char)
-		}
+		filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(excludeCharacters, false))
 	}
-
-	// Add tag filtering conditions (general tags)
+	
+	// Tag filters
 	if len(includeTags) > 0 {
-		placeholders := strings.Repeat("?,", len(includeTags))
-		placeholders = strings.TrimRight(placeholders, ",")
-		conditions = append(conditions, fmt.Sprintf(`
-			images.id IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'general'
-			)`, placeholders))
-		for _, tag := range includeTags {
-			args = append(args, tag)
-		}
+		filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(includeTags, true))
 	}
-
 	if len(excludeTags) > 0 {
-		placeholders := strings.Repeat("?,", len(excludeTags))
-		placeholders = strings.TrimRight(placeholders, ",")
-		conditions = append(conditions, fmt.Sprintf(`
-			images.id NOT IN (
-				SELECT DISTINCT it.image_id 
-				FROM image_tags it 
-				JOIN tags t ON it.tag_id = t.id 
-				WHERE t.name IN (%s) AND t.category = 'general'
-			)`, placeholders))
-		for _, tag := range excludeTags {
-			args = append(args, tag)
-		}
+		filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(excludeTags, false))
 	}
-
-	// Add explicitness filtering conditions (rating tags)
+	
+	// Explicitness filters
 	if len(includeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names using shared utility
-		ratingTags := utils.MapExplicitnessToTags(includeExplicitness)
-		if len(ratingTags) > 0 {
-			placeholders := strings.Repeat("?,", len(ratingTags))
-			placeholders = strings.TrimRight(placeholders, ",")
-			conditions = append(conditions, fmt.Sprintf(`
-				images.id IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'rating'
-				)`, placeholders))
-			for _, tag := range ratingTags {
-				args = append(args, tag)
-			}
-		}
+		filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(includeExplicitness, true))
 	}
-
 	if len(excludeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names using shared utility
-		ratingTags := utils.MapExplicitnessToTags(excludeExplicitness)
-		if len(ratingTags) > 0 {
-			placeholders := strings.Repeat("?,", len(ratingTags))
-			placeholders = strings.TrimRight(placeholders, ",")
-			conditions = append(conditions, fmt.Sprintf(`
-				images.id NOT IN (
-					SELECT DISTINCT it.image_id 
-					FROM image_tags it 
-					JOIN tags t ON it.tag_id = t.id 
-					WHERE t.name IN (%s) AND t.category = 'rating'
-				)`, placeholders))
-			for _, tag := range ratingTags {
-				args = append(args, tag)
-			}
+		filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(excludeExplicitness, false))
+	}
+	
+	// Add filter conditions to main conditions
+	if len(filterConditions) > 0 {
+		whereClause, filterArgs := utils.CombineFilterConditions(filterConditions)
+		if whereClause != "" {
+			// Extract conditions from WHERE clause and add to conditions array
+			conditionsPart := strings.TrimPrefix(whereClause, "WHERE ")
+			conditionsList := strings.Split(conditionsPart, " AND ")
+			conditions = append(conditions, conditionsList...)
+			args = append(args, filterArgs...)
 		}
 	}
 
