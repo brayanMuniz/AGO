@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/brayanMuniz/AGO/database"
+	"github.com/brayanMuniz/AGO/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +16,7 @@ func RegisterCategoriesRoute(r *gin.RouterGroup, db *sql.DB) {
 	categoryGroup.GET("/series", categoryHandler(db, "copyright"))
 	categoryGroup.GET("/characters", categoryHandler(db, "character"))
 	categoryGroup.GET("/artists", categoryHandler(db, "artist"))
-	categoryGroup.GET("/ratings", ratingsHandler())
+	categoryGroup.GET("/ratings", explicitnessHandler())
 	categoryGroup.GET("/explicitness", explicitnessHandler())
 	
 	// Get tag info by name
@@ -37,28 +38,17 @@ func categoryHandler(db *sql.DB, category string) gin.HandlerFunc {
 	}
 }
 
-func ratingsHandler() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		ratings := []map[string]interface{}{
-			{"id": 1, "name": "general", "category": "rating"},
-			{"id": 2, "name": "sensitive", "category": "rating"},
-			{"id": 3, "name": "questionable", "category": "rating"},
-			{"id": 4, "name": "explicit", "category": "rating"},
-		}
-		ctx.JSON(200, gin.H{"tags": ratings})
-	}
+// Shared explicitness levels data
+var explicitnessLevels = []map[string]interface{}{
+	{"id": 1, "name": "general", "category": "rating"},
+	{"id": 2, "name": "sensitive", "category": "rating"},
+	{"id": 3, "name": "questionable", "category": "rating"},
+	{"id": 4, "name": "explicit", "category": "rating"},
 }
 
 func explicitnessHandler() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		// Return explicitness levels for filtering
-		explicitness := []map[string]interface{}{
-			{"id": 1, "name": "general", "category": "rating"},
-			{"id": 2, "name": "sensitive", "category": "rating"},
-			{"id": 3, "name": "questionable", "category": "rating"},
-			{"id": 4, "name": "explicit", "category": "rating"},
-		}
-		ctx.JSON(200, gin.H{"tags": explicitness})
+		ctx.JSON(200, gin.H{"tags": explicitnessLevels})
 	}
 }
 
@@ -93,15 +83,8 @@ func getExplicitnessHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		
-		// Map URL names to actual tag names
-		tagNameMap := map[string]string{
-			"general":      "rating_general",
-			"sensitive":    "rating_sensitive", 
-			"questionable": "rating_questionable",
-			"explicit":     "rating_explicit",
-		}
-		
-		tagName, exists := tagNameMap[explicitnessName]
+		// Use shared explicitness mapping
+		tagName, exists := utils.ExplicitnessMapping[explicitnessName]
 		if !exists {
 			ctx.JSON(404, gin.H{"error": "Explicitness level not found"})
 			return

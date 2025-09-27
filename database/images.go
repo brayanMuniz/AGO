@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	
+	"github.com/brayanMuniz/AGO/utils"
 )
 
 var supportedExtensions = []string{".jpg", ".jpeg", ".png", ".webp", ".gif"}
@@ -279,20 +281,8 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 	var explicitnessArgs []any
 
 	if len(includeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names
-		var ratingTags []string
-		for _, level := range includeExplicitness {
-			switch level {
-			case "general":
-				ratingTags = append(ratingTags, "rating_general")
-			case "sensitive":
-				ratingTags = append(ratingTags, "rating_sensitive")
-			case "questionable":
-				ratingTags = append(ratingTags, "rating_questionable")
-			case "explicit":
-				ratingTags = append(ratingTags, "rating_explicit")
-			}
-		}
+		// Map user-friendly names to actual tag names using shared utility
+		ratingTags := utils.MapExplicitnessToTags(includeExplicitness)
 		if len(ratingTags) > 0 {
 			includePlaceholders := strings.TrimRight(strings.Repeat("?,", len(ratingTags)), ",")
 			explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`
@@ -309,20 +299,8 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 	}
 
 	if len(excludeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names
-		var ratingTags []string
-		for _, level := range excludeExplicitness {
-			switch level {
-			case "general":
-				ratingTags = append(ratingTags, "rating_general")
-			case "sensitive":
-				ratingTags = append(ratingTags, "rating_sensitive")
-			case "questionable":
-				ratingTags = append(ratingTags, "rating_questionable")
-			case "explicit":
-				ratingTags = append(ratingTags, "rating_explicit")
-			}
-		}
+		// Map user-friendly names to actual tag names using shared utility
+		ratingTags := utils.MapExplicitnessToTags(excludeExplicitness)
 		if len(ratingTags) > 0 {
 			excludePlaceholders := strings.TrimRight(strings.Repeat("?,", len(ratingTags)), ",")
 			explicitnessConditions = append(explicitnessConditions, fmt.Sprintf(`

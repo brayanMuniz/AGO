@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	
+	"github.com/brayanMuniz/AGO/utils"
 )
 
 func GetSmartAlbumImages(db *sql.DB, albumID int) ([]ImageResult, error) {
@@ -251,20 +253,8 @@ func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sort
 
 	// Add explicitness filtering conditions (rating tags)
 	if len(includeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names
-		var ratingTags []string
-		for _, level := range includeExplicitness {
-			switch level {
-			case "general":
-				ratingTags = append(ratingTags, "rating_general")
-			case "sensitive":
-				ratingTags = append(ratingTags, "rating_sensitive")
-			case "questionable":
-				ratingTags = append(ratingTags, "rating_questionable")
-			case "explicit":
-				ratingTags = append(ratingTags, "rating_explicit")
-			}
-		}
+		// Map user-friendly names to actual tag names using shared utility
+		ratingTags := utils.MapExplicitnessToTags(includeExplicitness)
 		if len(ratingTags) > 0 {
 			placeholders := strings.Repeat("?,", len(ratingTags))
 			placeholders = strings.TrimRight(placeholders, ",")
@@ -282,20 +272,8 @@ func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sort
 	}
 
 	if len(excludeExplicitness) > 0 {
-		// Map user-friendly names to actual tag names
-		var ratingTags []string
-		for _, level := range excludeExplicitness {
-			switch level {
-			case "general":
-				ratingTags = append(ratingTags, "rating_general")
-			case "sensitive":
-				ratingTags = append(ratingTags, "rating_sensitive")
-			case "questionable":
-				ratingTags = append(ratingTags, "rating_questionable")
-			case "explicit":
-				ratingTags = append(ratingTags, "rating_explicit")
-			}
-		}
+		// Map user-friendly names to actual tag names using shared utility
+		ratingTags := utils.MapExplicitnessToTags(excludeExplicitness)
 		if len(ratingTags) > 0 {
 			placeholders := strings.Repeat("?,", len(ratingTags))
 			placeholders = strings.TrimRight(placeholders, ",")

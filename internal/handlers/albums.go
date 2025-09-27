@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"github.com/brayanMuniz/AGO/database"
-	"github.com/gin-gonic/gin"
 	"strconv"
+	
+	"github.com/brayanMuniz/AGO/database"
+	"github.com/brayanMuniz/AGO/utils"
+	"github.com/gin-gonic/gin"
 )
 
 func CreateAlbumHandler(db *sql.DB) gin.HandlerFunc {
@@ -157,21 +159,12 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 		if includeExplicitness != "" {
 			explicitness := strings.Split(includeExplicitness, ",")
-			// Map user-friendly names to actual tag names
-			var ratingTags []string
-			for _, level := range explicitness {
-				level = strings.TrimSpace(level)
-				switch level {
-				case "general":
-					ratingTags = append(ratingTags, "rating_general")
-				case "sensitive":
-					ratingTags = append(ratingTags, "rating_sensitive")
-				case "questionable":
-					ratingTags = append(ratingTags, "rating_questionable")
-				case "explicit":
-					ratingTags = append(ratingTags, "rating_explicit")
-				}
+			// Trim whitespace from each level
+			for i := range explicitness {
+				explicitness[i] = strings.TrimSpace(explicitness[i])
 			}
+			// Map user-friendly names to actual tag names using shared utility
+			ratingTags := utils.MapExplicitnessToTags(explicitness)
 			if len(ratingTags) > 0 {
 				placeholders := make([]string, len(ratingTags))
 				for i, tag := range ratingTags {
@@ -190,21 +183,12 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 		if excludeExplicitness != "" {
 			explicitness := strings.Split(excludeExplicitness, ",")
-			// Map user-friendly names to actual tag names
-			var ratingTags []string
-			for _, level := range explicitness {
-				level = strings.TrimSpace(level)
-				switch level {
-				case "general":
-					ratingTags = append(ratingTags, "rating_general")
-				case "sensitive":
-					ratingTags = append(ratingTags, "rating_sensitive")
-				case "questionable":
-					ratingTags = append(ratingTags, "rating_questionable")
-				case "explicit":
-					ratingTags = append(ratingTags, "rating_explicit")
-				}
+			// Trim whitespace from each level
+			for i := range explicitness {
+				explicitness[i] = strings.TrimSpace(explicitness[i])
 			}
+			// Map user-friendly names to actual tag names using shared utility
+			ratingTags := utils.MapExplicitnessToTags(explicitness)
 			if len(ratingTags) > 0 {
 				placeholders := make([]string, len(ratingTags))
 				for i, tag := range ratingTags {
