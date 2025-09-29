@@ -50,26 +50,9 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		
-		// Parse pagination parameters
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-		sortBy := c.DefaultQuery("sort", "random")
-		seed := c.DefaultQuery("seed", "")
-		includeCharacters := c.DefaultQuery("include_characters", "")
-		excludeCharacters := c.DefaultQuery("exclude_characters", "")
-		includeTags := c.DefaultQuery("include_tags", "")
-		excludeTags := c.DefaultQuery("exclude_tags", "")
-		includeExplicitness := c.DefaultQuery("include_explicitness", "")
-		excludeExplicitness := c.DefaultQuery("exclude_explicitness", "")
-
-		if page < 1 {
-			page = 1
-		}
-		if limit < 1 || limit > 1000 {
-			limit = 20
-		}
-
-		offset := (page - 1) * limit
+		// Parse query parameters using shared utility
+		params := utils.ParseImageQueryParams(c)
+		offset := (params.Page - 1) * params.Limit
 
 		var albumType string
 		err := db.QueryRow("SELECT type FROM albums WHERE id = ?", id).Scan(&albumType)
@@ -82,57 +65,7 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		var totalCount int
 
 		// Build filter conditions using shared utilities
-		var filterConditions []utils.FilterCondition
-		
-		// Character filters
-		if includeCharacters != "" {
-			characters := strings.Split(includeCharacters, ",")
-			for i := range characters {
-				characters[i] = strings.TrimSpace(characters[i])
-			}
-			filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(characters, true))
-		}
-		if excludeCharacters != "" {
-			characters := strings.Split(excludeCharacters, ",")
-			for i := range characters {
-				characters[i] = strings.TrimSpace(characters[i])
-			}
-			filterConditions = append(filterConditions, utils.BuildCharacterFilterCondition(characters, false))
-		}
-		
-		// Tag filters
-		if includeTags != "" {
-			tags := strings.Split(includeTags, ",")
-			for i := range tags {
-				tags[i] = strings.TrimSpace(tags[i])
-			}
-			filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(tags, true))
-		}
-		if excludeTags != "" {
-			tags := strings.Split(excludeTags, ",")
-			for i := range tags {
-				tags[i] = strings.TrimSpace(tags[i])
-			}
-			filterConditions = append(filterConditions, utils.BuildGeneralTagFilterCondition(tags, false))
-		}
-		
-		// Explicitness filters
-		if includeExplicitness != "" {
-			explicitness := strings.Split(includeExplicitness, ",")
-			for i := range explicitness {
-				explicitness[i] = strings.TrimSpace(explicitness[i])
-			}
-			filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(explicitness, true))
-		}
-		if excludeExplicitness != "" {
-			explicitness := strings.Split(excludeExplicitness, ",")
-			for i := range explicitness {
-				explicitness[i] = strings.TrimSpace(explicitness[i])
-			}
-			filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(explicitness, false))
-		}
-		
-		// Combine filter conditions
+		filterConditions := utils.BuildFilterConditionsFromParams(params)
 		var filterWhereClause string
 		var allFilterArgs []interface{}
 		if len(filterConditions) > 0 {
@@ -145,7 +78,7 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 		// Build order by clause
 		var orderBy string
-		switch sortBy {
+		switch params.SortBy {
 		case "date_asc":
 			orderBy = "ORDER BY images.id ASC"
 		case "date_desc":
@@ -159,9 +92,9 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		case "likes_asc":
 			orderBy = "ORDER BY images.like_count ASC, images.id ASC"
 		case "random":
-			if seed != "" {
+			if params.Seed != "" {
 				// Use seeded random for reproducible results
-				orderBy = fmt.Sprintf("ORDER BY (images.id * %s) %% 1000000", seed)
+				orderBy = fmt.Sprintf("ORDER BY (images.id * %s) %% 1000000", params.Seed)
 			} else {
 				orderBy = "ORDER BY RANDOM()"
 			}
@@ -199,7 +132,7 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 
 			queryArgs := []interface{}{id}
 			queryArgs = append(queryArgs, allFilterArgs...)
-			queryArgs = append(queryArgs, limit, offset)
+			queryArgs = append(queryArgs, params.Limit, offset)
 			
 			rows, err := db.Query(query, queryArgs...)
 			if err != nil {
@@ -221,67 +154,25 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 		} else if albumType == "smart" {
 			albumID, _ := strconv.Atoi(id)
 			
-			// Parse character filters for smart albums
-			var includeCharactersList, excludeCharactersList []string
-			if includeCharacters != "" {
-				includeCharactersList = strings.Split(includeCharacters, ",")
-				for i := range includeCharactersList {
-					includeCharactersList[i] = strings.TrimSpace(includeCharactersList[i])
-				}
-			}
-			if excludeCharacters != "" {
-				excludeCharactersList = strings.Split(excludeCharacters, ",")
-				for i := range excludeCharactersList {
-					excludeCharactersList[i] = strings.TrimSpace(excludeCharactersList[i])
-				}
-			}
-
-			// Parse tag filters for smart albums
-			var includeTagsList, excludeTagsList []string
-			if includeTags != "" {
-				includeTagsList = strings.Split(includeTags, ",")
-				for i := range includeTagsList {
-					includeTagsList[i] = strings.TrimSpace(includeTagsList[i])
-				}
-			}
-			if excludeTags != "" {
-				excludeTagsList = strings.Split(excludeTags, ",")
-				for i := range excludeTagsList {
-					excludeTagsList[i] = strings.TrimSpace(excludeTagsList[i])
-				}
-			}
+			// Parse filter arrays using shared utility
+			includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList := utils.ParseFilterArrays(params)
 			
-			// Parse explicitness filters for smart albums
-			var includeExplicitnessList, excludeExplicitnessList []string
-			if includeExplicitness != "" {
-				includeExplicitnessList = strings.Split(includeExplicitness, ",")
-				for i := range includeExplicitnessList {
-					includeExplicitnessList[i] = strings.TrimSpace(includeExplicitnessList[i])
-				}
-			}
-			if excludeExplicitness != "" {
-				excludeExplicitnessList = strings.Split(excludeExplicitness, ",")
-				for i := range excludeExplicitnessList {
-					excludeExplicitnessList[i] = strings.TrimSpace(excludeExplicitnessList[i])
-				}
-			}
-			
-			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, page, limit, sortBy, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList)
+			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, params.Page, params.Limit, params.SortBy, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return
 			}
 		}
 
-		totalPages := (totalCount + limit - 1) / limit
+		totalPages := (totalCount + params.Limit - 1) / params.Limit
 
 		c.JSON(200, gin.H{
 			"images": images,
 			"pagination": gin.H{
-				"current_page": page,
+				"current_page": params.Page,
 				"total_pages":  totalPages,
 				"total_count":  totalCount,
-				"limit":        limit,
+				"limit":        params.Limit,
 			},
 		})
 	}

@@ -131,7 +131,6 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
             className="bg-gray-700 text-white px-2 py-1 text-sm rounded border border-gray-600 focus:border-pink-500 focus:outline-none"
           >
-            <option value={10}>10</option>
             <option value={20}>20</option>
             <option value={40}>40</option>
             <option value={60}>60</option>
