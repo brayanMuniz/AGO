@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useUrlParams } from './useUrlParams';
+import { useFilterHandlers } from '../utils/filterHandlers';
 
 export interface ImageItem {
   id: number;
@@ -233,41 +234,29 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     setImageSize(newSize);
   }, [setImageSize]);
 
-  const handleRemoveCharacterFilter = useCallback((characterName: string, type: 'include' | 'exclude') => {
-    if (type === 'include') {
-      const newInclude = includeCharacters?.filter(name => name !== characterName) || [];
-      setCharacterFilters(newInclude.length > 0 ? newInclude : undefined, excludeCharacters);
-    } else {
-      const newExclude = excludeCharacters?.filter(name => name !== characterName) || [];
-      setCharacterFilters(includeCharacters, newExclude.length > 0 ? newExclude : undefined);
-    }
-  }, [includeCharacters, excludeCharacters, setCharacterFilters]);
+  // Create filter handlers using shared utility
+  const filterHandlers = useFilterHandlers({
+    characters: {
+      include: includeCharacters,
+      exclude: excludeCharacters,
+      setFilters: setCharacterFilters,
+    },
+    tags: {
+      include: includeTags,
+      exclude: excludeTags,
+      setFilters: setTagFilters,
+    },
+    explicitness: {
+      include: includeExplicitness,
+      exclude: excludeExplicitness,
+      setFilters: setExplicitnessFilters,
+    },
+  });
 
-  const handleRemoveTagFilter = useCallback((tagName: string, type: 'include' | 'exclude') => {
-    if (type === 'include') {
-      const newInclude = includeTags?.filter(name => name !== tagName) || [];
-      setTagFilters(newInclude.length > 0 ? newInclude : undefined, excludeTags);
-    } else {
-      const newExclude = excludeTags?.filter(name => name !== tagName) || [];
-      setTagFilters(includeTags, newExclude.length > 0 ? newExclude : undefined);
-    }
-  }, [includeTags, excludeTags, setTagFilters]);
-
-  const handleRemoveExplicitnessFilter = useCallback((explicitnessLevel: string, type: 'include' | 'exclude') => {
-    if (type === 'include') {
-      const newInclude = includeExplicitness?.filter(level => level !== explicitnessLevel) || [];
-      setExplicitnessFilters(newInclude.length > 0 ? newInclude : undefined, excludeExplicitness);
-    } else {
-      const newExclude = excludeExplicitness?.filter(level => level !== explicitnessLevel) || [];
-      setExplicitnessFilters(includeExplicitness, newExclude.length > 0 ? newExclude : undefined);
-    }
-  }, [includeExplicitness, excludeExplicitness, setExplicitnessFilters]);
-
-  const handleClearAllFilters = useCallback(() => {
-    setCharacterFilters(undefined, undefined);
-    setTagFilters(undefined, undefined);
-    setExplicitnessFilters(undefined, undefined);
-  }, [setCharacterFilters, setTagFilters, setExplicitnessFilters]);
+  const handleRemoveCharacterFilter = useCallback(filterHandlers.handleRemoveCharacterFilter, [filterHandlers.handleRemoveCharacterFilter]);
+  const handleRemoveTagFilter = useCallback(filterHandlers.handleRemoveTagFilter, [filterHandlers.handleRemoveTagFilter]);
+  const handleRemoveExplicitnessFilter = useCallback(filterHandlers.handleRemoveExplicitnessFilter, [filterHandlers.handleRemoveExplicitnessFilter]);
+  const handleClearAllFilters = useCallback(filterHandlers.handleClearAllFilters, [filterHandlers.handleClearAllFilters]);
 
   const onCharacterFiltersChange = useCallback((filters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>) => {
     const include = filters.filter(f => f.type === 'include').map(f => f.name);

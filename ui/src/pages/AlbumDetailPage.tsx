@@ -9,6 +9,7 @@ import FilterDisplay from "../components/FilterDisplay";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useUrlParams } from "../hooks/useUrlParams";
 import { ApiEndpoints } from "../utils/apiEndpoints";
+import { useFilterHandlers } from "../utils/filterHandlers";
 
 interface BackendImageItem {
   id: number;
@@ -111,41 +112,29 @@ const AlbumDetailPage: React.FC = () => {
     setItemsPerPage(limit as any); // Type assertion, will be validated in hook
   };
 
-  const handleRemoveCharacterFilter = (characterName: string, type: 'include' | 'exclude') => {
-    if (type === 'include') {
-      const newInclude = includeCharacters?.filter(name => name !== characterName) || [];
-      setCharacterFilters(newInclude.length > 0 ? newInclude : undefined, excludeCharacters);
-    } else {
-      const newExclude = excludeCharacters?.filter(name => name !== characterName) || [];
-      setCharacterFilters(includeCharacters, newExclude.length > 0 ? newExclude : undefined);
-    }
-  };
+  // Create filter handlers using shared utility
+  const filterHandlers = useFilterHandlers({
+    characters: {
+      include: includeCharacters,
+      exclude: excludeCharacters,
+      setFilters: setCharacterFilters,
+    },
+    tags: {
+      include: includeTags,
+      exclude: excludeTags,
+      setFilters: setTagFilters,
+    },
+    explicitness: {
+      include: includeExplicitness,
+      exclude: excludeExplicitness,
+      setFilters: setExplicitnessFilters,
+    },
+  });
 
-  const handleRemoveTagFilter = (tagName: string, type: 'include' | 'exclude') => {
-    if (type === 'include') {
-      const newInclude = includeTags?.filter(name => name !== tagName) || [];
-      setTagFilters(newInclude.length > 0 ? newInclude : undefined, excludeTags);
-    } else {
-      const newExclude = excludeTags?.filter(name => name !== tagName) || [];
-      setTagFilters(includeTags, newExclude.length > 0 ? newExclude : undefined);
-    }
-  };
-
-  const handleRemoveExplicitnessFilter = (explicitnessLevel: string, type: 'include' | 'exclude') => {
-    if (type === 'include') {
-      const newInclude = includeExplicitness?.filter(level => level !== explicitnessLevel) || [];
-      setExplicitnessFilters(newInclude.length > 0 ? newInclude : undefined, excludeExplicitness);
-    } else {
-      const newExclude = excludeExplicitness?.filter(level => level !== explicitnessLevel) || [];
-      setExplicitnessFilters(includeExplicitness, newExclude.length > 0 ? newExclude : undefined);
-    }
-  };
-
-  const handleClearAllFilters = () => {
-    setCharacterFilters(undefined, undefined);
-    setTagFilters(undefined, undefined);
-    setExplicitnessFilters(undefined, undefined);
-  };
+  const handleRemoveCharacterFilter = filterHandlers.handleRemoveCharacterFilter;
+  const handleRemoveTagFilter = filterHandlers.handleRemoveTagFilter;
+  const handleRemoveExplicitnessFilter = filterHandlers.handleRemoveExplicitnessFilter;
+  const handleClearAllFilters = filterHandlers.handleClearAllFilters;
 
   const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
     setImageSize(newSize);
