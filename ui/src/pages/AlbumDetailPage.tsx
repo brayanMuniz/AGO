@@ -8,6 +8,7 @@ import ImageControlsBar from "../components/ImageControlsBar";
 import FilterDisplay from "../components/FilterDisplay";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useUrlParams } from "../hooks/useUrlParams";
+import { ApiEndpoints } from "../utils/apiEndpoints";
 
 interface BackendImageItem {
   id: number;
@@ -331,21 +332,20 @@ const AlbumDetailPage: React.FC = () => {
     
     try {
       setLoading(true);
-      const seedParam = seed ? `&seed=${seed}` : '';
-      const includeCharactersParam = includeCharacters && includeCharacters.length > 0 
-        ? `&include_characters=${includeCharacters.join(',')}` : '';
-      const excludeCharactersParam = excludeCharacters && excludeCharacters.length > 0 
-        ? `&exclude_characters=${excludeCharacters.join(',')}` : '';
-      const includeTagsParam = includeTags && includeTags.length > 0 
-        ? `&include_tags=${includeTags.join(',')}` : '';
-      const excludeTagsParam = excludeTags && excludeTags.length > 0 
-        ? `&exclude_tags=${excludeTags.join(',')}` : '';
-      const includeExplicitnessParam = includeExplicitness && includeExplicitness.length > 0 
-        ? `&include_explicitness=${includeExplicitness.join(',')}` : '';
-      const excludeExplicitnessParam = excludeExplicitness && excludeExplicitness.length > 0 
-        ? `&exclude_explicitness=${excludeExplicitness.join(',')}` : '';
+      const apiParams = {
+        page: pageNum,
+        limit: itemsPerPage,
+        sort: getBackendSortValue(sortBy),
+        seed: seed?.toString(),
+        includeCharacters: includeCharacters,
+        excludeCharacters: excludeCharacters,
+        includeTags: includeTags,
+        excludeTags: excludeTags,
+        includeExplicitness: includeExplicitness,
+        excludeExplicitness: excludeExplicitness,
+      };
       
-      const url = `/api/albums/${id}/images?page=${pageNum}&limit=${itemsPerPage}&sort=${getBackendSortValue(sortBy)}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}${includeExplicitnessParam}${excludeExplicitnessParam}`;
+      const url = ApiEndpoints.albumImages(id, apiParams);
       const imagesResponse = await fetch(url);
       if (!imagesResponse.ok) {
         throw new Error(`Failed to fetch album images: ${imagesResponse.status}`);

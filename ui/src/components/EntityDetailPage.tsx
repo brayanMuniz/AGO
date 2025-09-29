@@ -4,6 +4,7 @@ import Sidebar from "./SideBar";
 import MobileNav from "./MobileNav";
 import ImageGalleryPage from "./ImageGalleryPage";
 import { useSidebar } from "../contexts/SidebarContext";
+import { ApiEndpoints, LegacyParamConverters } from "../utils/apiEndpoints";
 
 interface EntityDetailPageProps {
   entityTypeSingular: string;
@@ -60,16 +61,9 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       includeExplicitness?: string;
       excludeExplicitness?: string;
     }) => {
-      const seedParam = params.seed ? `&seed=${params.seed}` : '';
-      const includeCharactersParam = params.includeCharacters ? `&include_characters=${params.includeCharacters}` : '';
-      const excludeCharactersParam = params.excludeCharacters ? `&exclude_characters=${params.excludeCharacters}` : '';
-      const includeTagsParam = params.includeTags ? `&include_tags=${params.includeTags}` : '';
-      const excludeTagsParam = params.excludeTags ? `&exclude_tags=${params.excludeTags}` : '';
-      const includeExplicitnessParam = params.includeExplicitness ? `&include_explicitness=${params.includeExplicitness}` : '';
-      const excludeExplicitnessParam = params.excludeExplicitness ? `&exclude_explicitness=${params.excludeExplicitness}` : '';
-      
+      const apiParams = LegacyParamConverters.fromLegacyParams(params);
       const tagName = getTagName(entityName || '', entityTypeSingular);
-      return `/api/images/by-tags?tags=${encodeURIComponent(tagName)}&page=${params.page}&limit=${params.limit}&sort=${params.sort}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}${includeExplicitnessParam}${excludeExplicitnessParam}`;
+      return ApiEndpoints.imagesByTags(tagName, apiParams);
     },
     initialLoading: true,
   };

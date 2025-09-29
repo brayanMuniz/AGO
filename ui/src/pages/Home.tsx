@@ -2,6 +2,7 @@ import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
 import ImageGalleryPage from "../components/ImageGalleryPage";
 import { useSidebar } from "../contexts/SidebarContext";
+import { ApiEndpoints, LegacyParamConverters } from "../utils/apiEndpoints";
 
 const Home = () => {
   const { isCollapsed } = useSidebar();
@@ -19,15 +20,8 @@ const Home = () => {
       includeExplicitness?: string;
       excludeExplicitness?: string;
     }) => {
-      const seedParam = params.seed ? `&seed=${params.seed}` : '';
-      const includeCharactersParam = params.includeCharacters ? `&include_characters=${params.includeCharacters}` : '';
-      const excludeCharactersParam = params.excludeCharacters ? `&exclude_characters=${params.excludeCharacters}` : '';
-      const includeTagsParam = params.includeTags ? `&include_tags=${params.includeTags}` : '';
-      const excludeTagsParam = params.excludeTags ? `&exclude_tags=${params.excludeTags}` : '';
-      const includeExplicitnessParam = params.includeExplicitness ? `&include_explicitness=${params.includeExplicitness}` : '';
-      const excludeExplicitnessParam = params.excludeExplicitness ? `&exclude_explicitness=${params.excludeExplicitness}` : '';
-      
-      return `/api/images?page=${params.page}&limit=${params.limit}&sort=${params.sort}${seedParam}${includeCharactersParam}${excludeCharactersParam}${includeTagsParam}${excludeTagsParam}${includeExplicitnessParam}${excludeExplicitnessParam}`;
+      const apiParams = LegacyParamConverters.fromLegacyParams(params);
+      return ApiEndpoints.images(apiParams);
     },
     initialLoading: true,
   };
