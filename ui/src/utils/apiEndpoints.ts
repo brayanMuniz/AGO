@@ -11,6 +11,10 @@ export interface ApiEndpointParams {
   excludeTags?: string | string[];
   includeExplicitness?: string | string[];
   excludeExplicitness?: string | string[];
+  includeSeries?: string | string[];
+  excludeSeries?: string | string[];
+  includeArtists?: string | string[];
+  excludeArtists?: string | string[];
 }
 
 /**
@@ -71,6 +75,26 @@ function buildQueryParams(params: ApiEndpointParams): string {
     queryParts.push(`exclude_explicitness=${excludeExplicitness}`);
   }
   
+  const includeSeries = normalizeFilterParam(params.includeSeries);
+  if (includeSeries) {
+    queryParts.push(`include_series=${includeSeries}`);
+  }
+  
+  const excludeSeries = normalizeFilterParam(params.excludeSeries);
+  if (excludeSeries) {
+    queryParts.push(`exclude_series=${excludeSeries}`);
+  }
+  
+  const includeArtists = normalizeFilterParam(params.includeArtists);
+  if (includeArtists) {
+    queryParts.push(`include_artists=${includeArtists}`);
+  }
+  
+  const excludeArtists = normalizeFilterParam(params.excludeArtists);
+  if (excludeArtists) {
+    queryParts.push(`exclude_artists=${excludeArtists}`);
+  }
+  
   return queryParts.join('&');
 }
 
@@ -121,6 +145,10 @@ export const LegacyParamConverters = {
     excludeTags?: string;
     includeExplicitness?: string;
     excludeExplicitness?: string;
+    includeSeries?: string;
+    excludeSeries?: string;
+    includeArtists?: string;
+    excludeArtists?: string;
   }): ApiEndpointParams => {
     return {
       page: legacyParams.page,
@@ -133,6 +161,10 @@ export const LegacyParamConverters = {
       excludeTags: legacyParams.excludeTags,
       includeExplicitness: legacyParams.includeExplicitness,
       excludeExplicitness: legacyParams.excludeExplicitness,
+      includeSeries: legacyParams.includeSeries,
+      excludeSeries: legacyParams.excludeSeries,
+      includeArtists: legacyParams.includeArtists,
+      excludeArtists: legacyParams.excludeArtists,
     };
   },
 };

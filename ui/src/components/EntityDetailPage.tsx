@@ -60,6 +60,10 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
       excludeTags?: string;
       includeExplicitness?: string;
       excludeExplicitness?: string;
+      includeSeries?: string;
+      excludeSeries?: string;
+      includeArtists?: string;
+      excludeArtists?: string;
     }) => {
       const apiParams = LegacyParamConverters.fromLegacyParams(params);
       const tagName = getTagName(entityName || '', entityTypeSingular);

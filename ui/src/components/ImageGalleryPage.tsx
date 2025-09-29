@@ -48,6 +48,10 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
     excludeTags,
     includeExplicitness,
     excludeExplicitness,
+    includeSeries,
+    excludeSeries,
+    includeArtists,
+    excludeArtists,
     handleSortChange,
     handleItemsPerPageChange,
     handleImageSizeChange,
@@ -55,6 +59,8 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
     handleRemoveCharacterFilter,
     handleRemoveTagFilter,
     handleRemoveExplicitnessFilter,
+    handleRemoveSeriesFilter,
+    handleRemoveArtistFilter,
     handleClearAllFilters,
     characterFilters,
     onCharacterFiltersChange,
@@ -62,6 +68,10 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
     onTagFiltersChange,
     explicitnessFilters,
     onExplicitnessFiltersChange,
+    seriesFilters,
+    onSeriesFiltersChange,
+    artistFilters,
+    onArtistFiltersChange,
   } = useImageGallery(config);
 
   return (
@@ -83,6 +93,10 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
         onTagFiltersChange={onTagFiltersChange}
         explicitnessFilters={explicitnessFilters}
         onExplicitnessFiltersChange={onExplicitnessFiltersChange}
+        seriesFilters={seriesFilters}
+        onSeriesFiltersChange={onSeriesFiltersChange}
+        artistFilters={artistFilters}
+        onArtistFiltersChange={onArtistFiltersChange}
         exportData={exportData}
         onExport={onExport}
         showExportControls={showExportControls}
@@ -96,9 +110,15 @@ const ImageGalleryPage: React.FC<ImageGalleryPageProps> = ({
         excludeTags={excludeTags}
         includeExplicitness={includeExplicitness}
         excludeExplicitness={excludeExplicitness}
+        includeSeries={includeSeries}
+        excludeSeries={excludeSeries}
+        includeArtists={includeArtists}
+        excludeArtists={excludeArtists}
         onRemoveCharacterFilter={handleRemoveCharacterFilter}
         onRemoveTagFilter={handleRemoveTagFilter}
         onRemoveExplicitnessFilter={handleRemoveExplicitnessFilter}
+        onRemoveSeriesFilter={handleRemoveSeriesFilter}
+        onRemoveArtistFilter={handleRemoveArtistFilter}
         onClearAllFilters={handleClearAllFilters}
       />
 

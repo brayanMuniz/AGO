@@ -19,6 +19,10 @@ type ImageQueryParams struct {
 	ExcludeTags         string
 	IncludeExplicitness string
 	ExcludeExplicitness string
+	IncludeSeries       string
+	ExcludeSeries       string
+	IncludeArtists      string
+	ExcludeArtists      string
 }
 
 // ParseImageQueryParams extracts and validates all image query parameters from gin context
@@ -45,12 +49,16 @@ func ParseImageQueryParams(c *gin.Context) ImageQueryParams {
 		ExcludeTags:         c.DefaultQuery("exclude_tags", ""),
 		IncludeExplicitness: c.DefaultQuery("include_explicitness", ""),
 		ExcludeExplicitness: c.DefaultQuery("exclude_explicitness", ""),
+		IncludeSeries:       c.DefaultQuery("include_series", ""),
+		ExcludeSeries:       c.DefaultQuery("exclude_series", ""),
+		IncludeArtists:      c.DefaultQuery("include_artists", ""),
+		ExcludeArtists:      c.DefaultQuery("exclude_artists", ""),
 	}
 }
 
 // ParseFilterArrays converts comma-separated filter strings to trimmed string arrays
 func ParseFilterArrays(params ImageQueryParams) (
-	includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness []string,
+	includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness, includeSeries, excludeSeries, includeArtists, excludeArtists []string,
 ) {
 	// Parse character filters
 	if params.IncludeCharacters != "" {
@@ -94,12 +102,40 @@ func ParseFilterArrays(params ImageQueryParams) (
 		}
 	}
 	
+	// Parse series filters
+	if params.IncludeSeries != "" {
+		includeSeries = strings.Split(params.IncludeSeries, ",")
+		for i := range includeSeries {
+			includeSeries[i] = strings.TrimSpace(includeSeries[i])
+		}
+	}
+	if params.ExcludeSeries != "" {
+		excludeSeries = strings.Split(params.ExcludeSeries, ",")
+		for i := range excludeSeries {
+			excludeSeries[i] = strings.TrimSpace(excludeSeries[i])
+		}
+	}
+	
+	// Parse artist filters
+	if params.IncludeArtists != "" {
+		includeArtists = strings.Split(params.IncludeArtists, ",")
+		for i := range includeArtists {
+			includeArtists[i] = strings.TrimSpace(includeArtists[i])
+		}
+	}
+	if params.ExcludeArtists != "" {
+		excludeArtists = strings.Split(params.ExcludeArtists, ",")
+		for i := range excludeArtists {
+			excludeArtists[i] = strings.TrimSpace(excludeArtists[i])
+		}
+	}
+	
 	return
 }
 
 // BuildFilterConditionsFromParams creates filter conditions from parsed parameters
 func BuildFilterConditionsFromParams(params ImageQueryParams) []FilterCondition {
-	includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness := ParseFilterArrays(params)
+	includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness, includeSeries, excludeSeries, includeArtists, excludeArtists := ParseFilterArrays(params)
 	
 	var filterConditions []FilterCondition
 	
@@ -125,6 +161,22 @@ func BuildFilterConditionsFromParams(params ImageQueryParams) []FilterCondition 
 	}
 	if len(excludeExplicitness) > 0 {
 		filterConditions = append(filterConditions, BuildExplicitnessFilterCondition(excludeExplicitness, false))
+	}
+	
+	// Series filters
+	if len(includeSeries) > 0 {
+		filterConditions = append(filterConditions, BuildSeriesFilterCondition(includeSeries, true))
+	}
+	if len(excludeSeries) > 0 {
+		filterConditions = append(filterConditions, BuildSeriesFilterCondition(excludeSeries, false))
+	}
+	
+	// Artist filters
+	if len(includeArtists) > 0 {
+		filterConditions = append(filterConditions, BuildArtistFilterCondition(includeArtists, true))
+	}
+	if len(excludeArtists) > 0 {
+		filterConditions = append(filterConditions, BuildArtistFilterCondition(excludeArtists, false))
 	}
 	
 	return filterConditions

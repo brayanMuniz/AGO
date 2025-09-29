@@ -28,6 +28,10 @@ export interface ImageGalleryConfig {
     excludeTags?: string;
     includeExplicitness?: string;
     excludeExplicitness?: string;
+    includeSeries?: string;
+    excludeSeries?: string;
+    includeArtists?: string;
+    excludeArtists?: string;
   }) => string;
   initialLoading?: boolean;
 }
@@ -52,6 +56,10 @@ export interface UseImageGalleryReturn {
   excludeTags?: string[];
   includeExplicitness?: string[];
   excludeExplicitness?: string[];
+  includeSeries?: string[];
+  excludeSeries?: string[];
+  includeArtists?: string[];
+  excludeArtists?: string[];
   
   // Handlers
   handleSortChange: (sort: string) => void;
@@ -61,6 +69,8 @@ export interface UseImageGalleryReturn {
   handleRemoveCharacterFilter: (characterName: string, type: 'include' | 'exclude') => void;
   handleRemoveTagFilter: (tagName: string, type: 'include' | 'exclude') => void;
   handleRemoveExplicitnessFilter: (explicitnessLevel: string, type: 'include' | 'exclude') => void;
+  handleRemoveSeriesFilter: (seriesName: string, type: 'include' | 'exclude') => void;
+  handleRemoveArtistFilter: (artistName: string, type: 'include' | 'exclude') => void;
   handleClearAllFilters: () => void;
   
   // Character filter props for components
@@ -74,6 +84,14 @@ export interface UseImageGalleryReturn {
   // Explicitness filter props for components
   explicitnessFilters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>;
   onExplicitnessFiltersChange: (filters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>) => void;
+  
+  // Series filter props for components
+  seriesFilters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>;
+  onSeriesFiltersChange: (filters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>) => void;
+  
+  // Artist filter props for components
+  artistFilters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>;
+  onArtistFiltersChange: (filters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>) => void;
   
   // Refresh function
   refreshImages: () => Promise<void>;
@@ -103,6 +121,10 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     excludeTags,
     includeExplicitness,
     excludeExplicitness,
+    includeSeries,
+    excludeSeries,
+    includeArtists,
+    excludeArtists,
     backendSortBy,
     setPerPage: setItemsPerPage,
     setImageSize,
@@ -110,6 +132,8 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     setCharacterFilters,
     setTagFilters,
     setExplicitnessFilters,
+    setSeriesFilters,
+    setArtistFilters,
     getBackendSortValue,
     handleBackendSortChange,
   } = useUrlParams();
@@ -144,6 +168,26 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     [excludeExplicitness]
   );
 
+  // Memoize series filter strings to prevent unnecessary re-renders
+  const includeSeriesString = useMemo(() => 
+    includeSeries ? includeSeries.join(',') : '', 
+    [includeSeries]
+  );
+  const excludeSeriesString = useMemo(() => 
+    excludeSeries ? excludeSeries.join(',') : '', 
+    [excludeSeries]
+  );
+
+  // Memoize artist filter strings to prevent unnecessary re-renders
+  const includeArtistsString = useMemo(() => 
+    includeArtists ? includeArtists.join(',') : '', 
+    [includeArtists]
+  );
+  const excludeArtistsString = useMemo(() => 
+    excludeArtists ? excludeArtists.join(',') : '', 
+    [excludeArtists]
+  );
+
   // Character filters for components
   const characterFilters = useMemo(() => [
     ...(includeCharacters || []).map(name => ({ id: 0, name, type: 'include' as const })),
@@ -162,6 +206,18 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     ...(excludeExplicitness || []).map(level => ({ id: 0, name: level, type: 'exclude' as const }))
   ], [includeExplicitness, excludeExplicitness]);
 
+  // Series filters for components
+  const seriesFilters = useMemo(() => [
+    ...(includeSeries || []).map(name => ({ id: 0, name, type: 'include' as const })),
+    ...(excludeSeries || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+  ], [includeSeries, excludeSeries]);
+
+  // Artist filters for components
+  const artistFilters = useMemo(() => [
+    ...(includeArtists || []).map(name => ({ id: 0, name, type: 'include' as const })),
+    ...(excludeArtists || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+  ], [includeArtists, excludeArtists]);
+
   // Fetch images function
   const fetchImages = useCallback(async (pageNum: number = page) => {
     try {
@@ -179,6 +235,10 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
         excludeTags: excludeTagsString || undefined,
         includeExplicitness: includeExplicitnessString || undefined,
         excludeExplicitness: excludeExplicitnessString || undefined,
+        includeSeries: includeSeriesString || undefined,
+        excludeSeries: excludeSeriesString || undefined,
+        includeArtists: includeArtistsString || undefined,
+        excludeArtists: excludeArtistsString || undefined,
       });
 
       const response = await fetch(url);
@@ -211,7 +271,7 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     } finally {
       setLoading(false);
     }
-  }, [config, itemsPerPage, sortBy, getBackendSortValue, seed, includeCharactersString, excludeCharactersString, includeTagsString, excludeTagsString, includeExplicitnessString, excludeExplicitnessString]);
+  }, [config, itemsPerPage, sortBy, getBackendSortValue, seed, includeCharactersString, excludeCharactersString, includeTagsString, excludeTagsString, includeExplicitnessString, excludeExplicitnessString, includeSeriesString, excludeSeriesString, includeArtistsString, excludeArtistsString]);
 
   // Refresh function
   const refreshImages = useCallback(() => fetchImages(page), [fetchImages, page]);
@@ -219,7 +279,7 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
   // Effect to fetch images when parameters change
   useEffect(() => {
     fetchImages(page);
-  }, [sortBy, itemsPerPage, page, includeCharactersString, excludeCharactersString, includeTagsString, excludeTagsString, includeExplicitnessString, excludeExplicitnessString]);
+  }, [sortBy, itemsPerPage, page, includeCharactersString, excludeCharactersString, includeTagsString, excludeTagsString, includeExplicitnessString, excludeExplicitnessString, includeSeriesString, excludeSeriesString, includeArtistsString, excludeArtistsString]);
 
   // Handler functions
   const handleSortChange = useCallback((sort: string) => {
@@ -251,11 +311,23 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
       exclude: excludeExplicitness,
       setFilters: setExplicitnessFilters,
     },
+    series: {
+      include: includeSeries,
+      exclude: excludeSeries,
+      setFilters: setSeriesFilters,
+    },
+    artists: {
+      include: includeArtists,
+      exclude: excludeArtists,
+      setFilters: setArtistFilters,
+    },
   });
 
   const handleRemoveCharacterFilter = useCallback(filterHandlers.handleRemoveCharacterFilter, [filterHandlers.handleRemoveCharacterFilter]);
   const handleRemoveTagFilter = useCallback(filterHandlers.handleRemoveTagFilter, [filterHandlers.handleRemoveTagFilter]);
   const handleRemoveExplicitnessFilter = useCallback(filterHandlers.handleRemoveExplicitnessFilter, [filterHandlers.handleRemoveExplicitnessFilter]);
+  const handleRemoveSeriesFilter = useCallback(filterHandlers.handleRemoveSeriesFilter, [filterHandlers.handleRemoveSeriesFilter]);
+  const handleRemoveArtistFilter = useCallback(filterHandlers.handleRemoveArtistFilter, [filterHandlers.handleRemoveArtistFilter]);
   const handleClearAllFilters = useCallback(filterHandlers.handleClearAllFilters, [filterHandlers.handleClearAllFilters]);
 
   const onCharacterFiltersChange = useCallback((filters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>) => {
@@ -285,6 +357,24 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     );
   }, [setExplicitnessFilters]);
 
+  const onSeriesFiltersChange = useCallback((filters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>) => {
+    const include = filters.filter(f => f.type === 'include').map(f => f.name);
+    const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+    setSeriesFilters(
+      include.length > 0 ? include : undefined,
+      exclude.length > 0 ? exclude : undefined
+    );
+  }, [setSeriesFilters]);
+
+  const onArtistFiltersChange = useCallback((filters: Array<{ id: number; name: string; type: 'include' | 'exclude' }>) => {
+    const include = filters.filter(f => f.type === 'include').map(f => f.name);
+    const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+    setArtistFilters(
+      include.length > 0 ? include : undefined,
+      exclude.length > 0 ? exclude : undefined
+    );
+  }, [setArtistFilters]);
+
   return {
     // Data
     images,
@@ -305,6 +395,10 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     excludeTags,
     includeExplicitness,
     excludeExplicitness,
+    includeSeries,
+    excludeSeries,
+    includeArtists,
+    excludeArtists,
     
     // Handlers
     handleSortChange,
@@ -314,6 +408,8 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     handleRemoveCharacterFilter,
     handleRemoveTagFilter,
     handleRemoveExplicitnessFilter,
+    handleRemoveSeriesFilter,
+    handleRemoveArtistFilter,
     handleClearAllFilters,
     
     // Character filter props
@@ -327,6 +423,14 @@ export const useImageGallery = (config: ImageGalleryConfig): UseImageGalleryRetu
     // Explicitness filter props
     explicitnessFilters,
     onExplicitnessFiltersChange,
+    
+    // Series filter props
+    seriesFilters,
+    onSeriesFiltersChange,
+    
+    // Artist filter props
+    artistFilters,
+    onArtistFiltersChange,
     
     // Refresh function
     refreshImages,

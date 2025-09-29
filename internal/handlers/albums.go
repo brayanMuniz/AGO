@@ -155,9 +155,9 @@ func GetAlbumImagesHandler(db *sql.DB) gin.HandlerFunc {
 			albumID, _ := strconv.Atoi(id)
 			
 			// Parse filter arrays using shared utility
-			includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList := utils.ParseFilterArrays(params)
+			includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList, includeSeriesList, excludeSeriesList, includeArtistsList, excludeArtistsList := utils.ParseFilterArrays(params)
 			
-			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, params.Page, params.Limit, params.SortBy, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList)
+			images, totalCount, err = database.GetSmartAlbumImagesPaginated(db, albumID, params.Page, params.Limit, params.SortBy, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList, includeSeriesList, excludeSeriesList, includeArtistsList, excludeArtistsList)
 			if err != nil {
 				c.JSON(500, gin.H{"error": err.Error()})
 				return

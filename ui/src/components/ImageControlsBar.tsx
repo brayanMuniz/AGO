@@ -11,6 +11,8 @@ interface ExportData {
 type CharacterFilter = FilterItem;
 type TagFilter = FilterItem;
 type ExplicitnessFilter = FilterItem;
+type SeriesFilter = FilterItem;
+type ArtistFilter = FilterItem;
 
 interface ImageControlsBarProps {
   // Sorting controls
@@ -32,6 +34,10 @@ interface ImageControlsBarProps {
   onTagFiltersChange?: (filters: TagFilter[]) => void;
   explicitnessFilters?: ExplicitnessFilter[];
   onExplicitnessFiltersChange?: (filters: ExplicitnessFilter[]) => void;
+  seriesFilters?: SeriesFilter[];
+  onSeriesFiltersChange?: (filters: SeriesFilter[]) => void;
+  artistFilters?: ArtistFilter[];
+  onArtistFiltersChange?: (filters: ArtistFilter[]) => void;
   
   // Export controls
   exportData?: ExportData;
@@ -58,6 +64,10 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   onTagFiltersChange,
   explicitnessFilters = [],
   onExplicitnessFiltersChange,
+  seriesFilters = [],
+  onSeriesFiltersChange,
+  artistFilters = [],
+  onArtistFiltersChange,
   exportData,
   onExport,
   showSortControls = true,
@@ -71,6 +81,8 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
   const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [showExplicitnessModal, setShowExplicitnessModal] = useState(false);
+  const [showSeriesModal, setShowSeriesModal] = useState(false);
+  const [showArtistModal, setShowArtistModal] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
@@ -198,6 +210,24 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
               >
                 Explicitness
               </button>
+              <button
+                onClick={() => {
+                  setShowSeriesModal(true);
+                  setShowFilterDropdown(false);
+                }}
+                className="w-full text-left px-3 py-2 text-white text-sm hover:bg-gray-600"
+              >
+                Series
+              </button>
+              <button
+                onClick={() => {
+                  setShowArtistModal(true);
+                  setShowFilterDropdown(false);
+                }}
+                className="w-full text-left px-3 py-2 text-white text-sm hover:bg-gray-600"
+              >
+                Artists
+              </button>
             </div>
           )}
         </div>
@@ -296,6 +326,36 @@ const ImageControlsBar: React.FC<ImageControlsBarProps> = ({
         excludeButtonColor="bg-pink-600"
         includeButtonHoverColor="hover:bg-purple-700"
         excludeButtonHoverColor="hover:bg-pink-700"
+      />
+
+      {/* Series Filter Modal - Using FilterModal Component */}
+      <FilterModal
+        isOpen={showSeriesModal}
+        onClose={() => setShowSeriesModal(false)}
+        title="Series Filter"
+        searchPlaceholder="Search series..."
+        apiEndpoint="/api/categories/series"
+        currentFilters={seriesFilters}
+        onFiltersChange={onSeriesFiltersChange || (() => {})}
+        includeButtonColor="bg-indigo-600"
+        excludeButtonColor="bg-yellow-600"
+        includeButtonHoverColor="hover:bg-indigo-700"
+        excludeButtonHoverColor="hover:bg-yellow-700"
+      />
+
+      {/* Artist Filter Modal - Using FilterModal Component */}
+      <FilterModal
+        isOpen={showArtistModal}
+        onClose={() => setShowArtistModal(false)}
+        title="Artist Filter"
+        searchPlaceholder="Search artists..."
+        apiEndpoint="/api/categories/artists"
+        currentFilters={artistFilters}
+        onFiltersChange={onArtistFiltersChange || (() => {})}
+        includeButtonColor="bg-teal-600"
+        excludeButtonColor="bg-rose-600"
+        includeButtonHoverColor="hover:bg-teal-700"
+        excludeButtonHoverColor="hover:bg-rose-700"
       />
 
       {/* Tag Filter Modal */}

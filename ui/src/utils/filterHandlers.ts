@@ -116,8 +116,18 @@ export function useFilterHandlers(filters: {
     exclude: string[] | undefined;
     setFilters: (include: string[] | undefined, exclude: string[] | undefined) => void;
   };
+  series?: {
+    include: string[] | undefined;
+    exclude: string[] | undefined;
+    setFilters: (include: string[] | undefined, exclude: string[] | undefined) => void;
+  };
+  artists?: {
+    include: string[] | undefined;
+    exclude: string[] | undefined;
+    setFilters: (include: string[] | undefined, exclude: string[] | undefined) => void;
+  };
 }) {
-  return {
+  const handlers: any = {
     handleRemoveCharacterFilter: FilterHandlers.character(
       filters.characters.include,
       filters.characters.exclude,
@@ -137,6 +147,32 @@ export function useFilterHandlers(filters: {
       filters.characters.setFilters(undefined, undefined);
       filters.tags.setFilters(undefined, undefined);
       filters.explicitness.setFilters(undefined, undefined);
+      if (filters.series) {
+        filters.series.setFilters(undefined, undefined);
+      }
+      if (filters.artists) {
+        filters.artists.setFilters(undefined, undefined);
+      }
     },
   };
+
+  // Add series handlers if provided
+  if (filters.series) {
+    handlers.handleRemoveSeriesFilter = FilterHandlers.tag(
+      filters.series.include,
+      filters.series.exclude,
+      filters.series.setFilters
+    );
+  }
+
+  // Add artist handlers if provided
+  if (filters.artists) {
+    handlers.handleRemoveArtistFilter = FilterHandlers.tag(
+      filters.artists.include,
+      filters.artists.exclude,
+      filters.artists.setFilters
+    );
+  }
+
+  return handlers;
 }

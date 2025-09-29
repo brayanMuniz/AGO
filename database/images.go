@@ -176,7 +176,7 @@ func GetImagesByTags(db *sql.DB, tags []string) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string, includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness []string) ([]ImageResult, int, error) {
+func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy string, seed string, includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness, includeSeries, excludeSeries, includeArtists, excludeArtists []string) ([]ImageResult, int, error) {
 	if len(tags) == 0 {
 		return nil, 0, fmt.Errorf("no tags provided")
 	}
@@ -237,6 +237,22 @@ func GetImagesByTagsPaginated(db *sql.DB, tags []string, page, limit int, sortBy
 	}
 	if len(excludeExplicitness) > 0 {
 		filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(excludeExplicitness, false))
+	}
+	
+	// Series filters
+	if len(includeSeries) > 0 {
+		filterConditions = append(filterConditions, utils.BuildSeriesFilterCondition(includeSeries, true))
+	}
+	if len(excludeSeries) > 0 {
+		filterConditions = append(filterConditions, utils.BuildSeriesFilterCondition(excludeSeries, false))
+	}
+	
+	// Artist filters
+	if len(includeArtists) > 0 {
+		filterConditions = append(filterConditions, utils.BuildArtistFilterCondition(includeArtists, true))
+	}
+	if len(excludeArtists) > 0 {
+		filterConditions = append(filterConditions, utils.BuildArtistFilterCondition(excludeArtists, false))
 	}
 	
 	// Combine filter conditions

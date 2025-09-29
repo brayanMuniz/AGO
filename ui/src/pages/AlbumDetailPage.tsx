@@ -92,6 +92,10 @@ const AlbumDetailPage: React.FC = () => {
     excludeTags,
     includeExplicitness,
     excludeExplicitness,
+    includeSeries,
+    excludeSeries,
+    includeArtists,
+    excludeArtists,
     backendSortBy, 
     setPerPage: setItemsPerPage, 
     setImageSize, 
@@ -99,6 +103,8 @@ const AlbumDetailPage: React.FC = () => {
     setCharacterFilters,
     setTagFilters,
     setExplicitnessFilters,
+    setSeriesFilters,
+    setArtistFilters,
     getBackendSortValue, 
     handleBackendSortChange 
   } = useUrlParams();
@@ -332,6 +338,10 @@ const AlbumDetailPage: React.FC = () => {
         excludeTags: excludeTags,
         includeExplicitness: includeExplicitness,
         excludeExplicitness: excludeExplicitness,
+        includeSeries: includeSeries,
+        excludeSeries: excludeSeries,
+        includeArtists: includeArtists,
+        excludeArtists: excludeArtists,
       };
       
       const url = ApiEndpoints.albumImages(id, apiParams);

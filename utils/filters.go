@@ -53,17 +53,25 @@ func BuildTagFilterCondition(tags []string, category string, include bool) Filte
 func BuildCharacterFilterCondition(characters []string, include bool) FilterCondition {
 	return BuildTagFilterCondition(characters, "character", include)
 }
-
 // BuildGeneralTagFilterCondition creates a filter condition for general tags
 func BuildGeneralTagFilterCondition(tags []string, include bool) FilterCondition {
 	return BuildTagFilterCondition(tags, "general", include)
 }
 
-// BuildExplicitnessFilterCondition creates a filter condition for explicitness/rating tags
+// BuildExplicitnessFilterCondition is a wrapper for BuildTagFilterCondition for explicitness (rating) tags
 func BuildExplicitnessFilterCondition(explicitnessLevels []string, include bool) FilterCondition {
-	// Map explicitness levels to rating tags
 	ratingTags := MapExplicitnessToTags(explicitnessLevels)
 	return BuildTagFilterCondition(ratingTags, "rating", include)
+}
+
+// BuildSeriesFilterCondition is a wrapper for BuildTagFilterCondition for series (copyright) tags
+func BuildSeriesFilterCondition(series []string, include bool) FilterCondition {
+	return BuildTagFilterCondition(series, "copyright", include)
+}
+
+// BuildArtistFilterCondition is a wrapper for BuildTagFilterCondition for artist tags
+func BuildArtistFilterCondition(artists []string, include bool) FilterCondition {
+	return BuildTagFilterCondition(artists, "artist", include)
 }
 
 // CombineFilterConditions combines multiple filter conditions into a single WHERE clause

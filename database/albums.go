@@ -139,7 +139,7 @@ func GetSmartAlbumImages(db *sql.DB, albumID int) ([]ImageResult, error) {
 	return results, nil
 }
 
-func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sortBy string, includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness []string) ([]ImageResult, int, error) {
+func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sortBy string, includeCharacters, excludeCharacters, includeTags, excludeTags, includeExplicitness, excludeExplicitness, includeSeries, excludeSeries, includeArtists, excludeArtists []string) ([]ImageResult, int, error) {
 	var includeTagCSV, excludeTagCSV, includeAlbumCSV, excludeAlbumCSV string
 	var minRating int
 	var favoriteOnly bool
@@ -214,6 +214,22 @@ func GetSmartAlbumImagesPaginated(db *sql.DB, albumID int, page, limit int, sort
 	}
 	if len(excludeExplicitness) > 0 {
 		filterConditions = append(filterConditions, utils.BuildExplicitnessFilterCondition(excludeExplicitness, false))
+	}
+	
+	// Series filters
+	if len(includeSeries) > 0 {
+		filterConditions = append(filterConditions, utils.BuildSeriesFilterCondition(includeSeries, true))
+	}
+	if len(excludeSeries) > 0 {
+		filterConditions = append(filterConditions, utils.BuildSeriesFilterCondition(excludeSeries, false))
+	}
+	
+	// Artist filters
+	if len(includeArtists) > 0 {
+		filterConditions = append(filterConditions, utils.BuildArtistFilterCondition(includeArtists, true))
+	}
+	if len(excludeArtists) > 0 {
+		filterConditions = append(filterConditions, utils.BuildArtistFilterCondition(excludeArtists, false))
 	}
 	
 	// Add filter conditions to main conditions

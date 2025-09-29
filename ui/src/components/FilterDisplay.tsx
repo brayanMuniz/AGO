@@ -7,9 +7,15 @@ interface FilterDisplayProps {
   excludeTags?: string[];
   includeExplicitness?: string[];
   excludeExplicitness?: string[];
+  includeSeries?: string[];
+  excludeSeries?: string[];
+  includeArtists?: string[];
+  excludeArtists?: string[];
   onRemoveCharacterFilter?: (characterName: string, type: 'include' | 'exclude') => void;
   onRemoveTagFilter?: (tagName: string, type: 'include' | 'exclude') => void;
   onRemoveExplicitnessFilter?: (explicitnessLevel: string, type: 'include' | 'exclude') => void;
+  onRemoveSeriesFilter?: (seriesName: string, type: 'include' | 'exclude') => void;
+  onRemoveArtistFilter?: (artistName: string, type: 'include' | 'exclude') => void;
   onClearAllFilters?: () => void;
 }
 
@@ -20,14 +26,22 @@ const FilterDisplay: React.FC<FilterDisplayProps> = ({
   excludeTags = [],
   includeExplicitness = [],
   excludeExplicitness = [],
+  includeSeries = [],
+  excludeSeries = [],
+  includeArtists = [],
+  excludeArtists = [],
   onRemoveCharacterFilter,
   onRemoveTagFilter,
   onRemoveExplicitnessFilter,
+  onRemoveSeriesFilter,
+  onRemoveArtistFilter,
   onClearAllFilters,
 }) => {
   const hasFilters = includeCharacters.length > 0 || excludeCharacters.length > 0 || 
                      includeTags.length > 0 || excludeTags.length > 0 ||
-                     includeExplicitness.length > 0 || excludeExplicitness.length > 0;
+                     includeExplicitness.length > 0 || excludeExplicitness.length > 0 ||
+                     includeSeries.length > 0 || excludeSeries.length > 0 ||
+                     includeArtists.length > 0 || excludeArtists.length > 0;
 
   if (!hasFilters) {
     return null;
@@ -148,6 +162,78 @@ const FilterDisplay: React.FC<FilterDisplayProps> = ({
             {onRemoveExplicitnessFilter && (
               <button
                 onClick={() => onRemoveExplicitnessFilter(level, 'exclude')}
+                className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+
+        {/* Include Series Filters */}
+        {includeSeries.map((series) => (
+          <span
+            key={`include-series-${series}`}
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 bg-indigo-600 text-white"
+          >
+            Include Series: {series}
+            {onRemoveSeriesFilter && (
+              <button
+                onClick={() => onRemoveSeriesFilter(series, 'include')}
+                className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+
+        {/* Exclude Series Filters */}
+        {excludeSeries.map((series) => (
+          <span
+            key={`exclude-series-${series}`}
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 bg-yellow-600 text-white"
+          >
+            Exclude Series: {series}
+            {onRemoveSeriesFilter && (
+              <button
+                onClick={() => onRemoveSeriesFilter(series, 'exclude')}
+                className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+
+        {/* Include Artist Filters */}
+        {includeArtists.map((artist) => (
+          <span
+            key={`include-artist-${artist}`}
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 bg-teal-600 text-white"
+          >
+            Include Artist: {artist}
+            {onRemoveArtistFilter && (
+              <button
+                onClick={() => onRemoveArtistFilter(artist, 'include')}
+                className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+
+        {/* Exclude Artist Filters */}
+        {excludeArtists.map((artist) => (
+          <span
+            key={`exclude-artist-${artist}`}
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 bg-rose-600 text-white"
+          >
+            Exclude Artist: {artist}
+            {onRemoveArtistFilter && (
+              <button
+                onClick={() => onRemoveArtistFilter(artist, 'exclude')}
                 className="ml-1 hover:bg-black hover:bg-opacity-20 rounded"
               >
                 ×

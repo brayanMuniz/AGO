@@ -17,6 +17,10 @@ export interface UrlParams {
   excludeTags?: string[]; // Tag names to exclude
   includeExplicitness?: string[]; // Explicitness levels to include (general, sensitive, questionable, explicit)
   excludeExplicitness?: string[]; // Explicitness levels to exclude
+  includeSeries?: string[]; // Series names to include
+  excludeSeries?: string[]; // Series names to exclude
+  includeArtists?: string[]; // Artist names to include
+  excludeArtists?: string[]; // Artist names to exclude
 }
 
 const DEFAULT_PARAMS: UrlParams = {
@@ -70,6 +74,14 @@ export const useUrlParams = () => {
     // Parse explicitness filters
     const includeExplicitness = searchParams.get('include_explicitness')?.split(',').filter(Boolean) || undefined;
     const excludeExplicitness = searchParams.get('exclude_explicitness')?.split(',').filter(Boolean) || undefined;
+    
+    // Parse series filters
+    const includeSeries = searchParams.get('include_series')?.split(',').filter(Boolean) || undefined;
+    const excludeSeries = searchParams.get('exclude_series')?.split(',').filter(Boolean) || undefined;
+    
+    // Parse artist filters
+    const includeArtists = searchParams.get('include_artists')?.split(',').filter(Boolean) || undefined;
+    const excludeArtists = searchParams.get('exclude_artists')?.split(',').filter(Boolean) || undefined;
 
     // Validate parameters - handle both user-friendly and backend parameter names
     let validSortBy: SortBy;
@@ -100,7 +112,11 @@ export const useUrlParams = () => {
       includeTags,
       excludeTags,
       includeExplicitness,
-      excludeExplicitness
+      excludeExplicitness,
+      includeSeries,
+      excludeSeries,
+      includeArtists,
+      excludeArtists
     };
   }, [searchParams]);
 
@@ -162,6 +178,26 @@ export const useUrlParams = () => {
     } else if (updatedParams.excludeExplicitness !== undefined) {
       newSearchParams.delete('exclude_explicitness');
     }
+    if (updatedParams.includeSeries && updatedParams.includeSeries.length > 0) {
+      newSearchParams.set('include_series', updatedParams.includeSeries.join(','));
+    } else if (updatedParams.includeSeries !== undefined) {
+      newSearchParams.delete('include_series');
+    }
+    if (updatedParams.excludeSeries && updatedParams.excludeSeries.length > 0) {
+      newSearchParams.set('exclude_series', updatedParams.excludeSeries.join(','));
+    } else if (updatedParams.excludeSeries !== undefined) {
+      newSearchParams.delete('exclude_series');
+    }
+    if (updatedParams.includeArtists && updatedParams.includeArtists.length > 0) {
+      newSearchParams.set('include_artists', updatedParams.includeArtists.join(','));
+    } else if (updatedParams.includeArtists !== undefined) {
+      newSearchParams.delete('include_artists');
+    }
+    if (updatedParams.excludeArtists && updatedParams.excludeArtists.length > 0) {
+      newSearchParams.set('exclude_artists', updatedParams.excludeArtists.join(','));
+    } else if (updatedParams.excludeArtists !== undefined) {
+      newSearchParams.delete('exclude_artists');
+    }
 
     setSearchParams(newSearchParams, { replace: true });
   }, [getCurrentParams, setSearchParams]);
@@ -202,6 +238,14 @@ export const useUrlParams = () => {
     updateParams({ includeExplicitness, excludeExplicitness });
   }, [updateParams]);
 
+  const setSeriesFilters = useCallback((includeSeries?: string[], excludeSeries?: string[]) => {
+    updateParams({ includeSeries, excludeSeries });
+  }, [updateParams]);
+
+  const setArtistFilters = useCallback((includeArtists?: string[], excludeArtists?: string[]) => {
+    updateParams({ includeArtists, excludeArtists });
+  }, [updateParams]);
+
   // Handle backend parameter changes from ImageControlsBar
   const handleBackendSortChange = useCallback((backendSort: string) => {
     const userFriendlySort = REVERSE_SORT_MAP[backendSort];
@@ -226,6 +270,10 @@ export const useUrlParams = () => {
     excludeTags: params.excludeTags,
     includeExplicitness: params.includeExplicitness,
     excludeExplicitness: params.excludeExplicitness,
+    includeSeries: params.includeSeries,
+    excludeSeries: params.excludeSeries,
+    includeArtists: params.includeArtists,
+    excludeArtists: params.excludeArtists,
     
     // Backend values for components that expect them
     backendSortBy: getBackendSortValue(params.sortBy),
@@ -238,6 +286,8 @@ export const useUrlParams = () => {
     setCharacterFilters,
     setTagFilters,
     setExplicitnessFilters,
+    setSeriesFilters,
+    setArtistFilters,
     updateParams,
     handleBackendSortChange,
     

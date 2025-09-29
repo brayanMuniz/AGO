@@ -147,10 +147,10 @@ func GetImagesByTagsHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Parse filter arrays using shared utility
-		includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList := utils.ParseFilterArrays(params)
+		includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList, includeSeriesList, excludeSeriesList, includeArtistsList, excludeArtistsList := utils.ParseFilterArrays(params)
 
 		// Get paginated results
-		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, params.Page, params.Limit, params.SortBy, params.Seed, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList)
+		results, totalCount, err := database.GetImagesByTagsPaginated(db, tagList, params.Page, params.Limit, params.SortBy, params.Seed, includeCharactersList, excludeCharactersList, includeTagsList, excludeTagsList, includeExplicitnessList, excludeExplicitnessList, includeSeriesList, excludeSeriesList, includeArtistsList, excludeArtistsList)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": err.Error()})
 			return
