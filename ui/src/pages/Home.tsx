@@ -1,6 +1,6 @@
 import Sidebar from "../components/SideBar";
 import MobileNav from "../components/MobileNav";
-import ImageGalleryPage from "../components/ImageGalleryPage";
+import FilterableGalleryPage from "../components/FilterableGalleryPage";
 import { useSidebar } from "../contexts/SidebarContext";
 import { ApiEndpoints, LegacyParamConverters } from "../utils/apiEndpoints";
 
@@ -44,7 +44,7 @@ const Home = () => {
               </p>
             </div>
 
-            <ImageGalleryPage
+            <FilterableGalleryPage
               config={config}
               showExportControls={false}
             />

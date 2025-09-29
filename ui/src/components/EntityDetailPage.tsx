@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Sidebar from "./SideBar";
 import MobileNav from "./MobileNav";
-import ImageGalleryPage from "./ImageGalleryPage";
+import FilterableGalleryPage from "./FilterableGalleryPage";
 import { useSidebar } from "../contexts/SidebarContext";
 import { ApiEndpoints, LegacyParamConverters } from "../utils/apiEndpoints";
 
@@ -186,7 +186,7 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
         <MobileNav />
         <main className="flex-1 p-6">
           <div className="max-w-full mx-auto">
-            <ImageGalleryPage
+            <FilterableGalleryPage
               config={config}
               customHeader={customHeader}
               exportData={entityName ? {
@@ -198,7 +198,6 @@ const EntityDetailPage: React.FC<EntityDetailPageProps> = ({
               showExportControls={true}
               onImageSelect={handleImageSelect}
               selectedImages={selectedImages}
-              isSelectingImages={isSelectingImages}
             />
           </div>
         </main>
