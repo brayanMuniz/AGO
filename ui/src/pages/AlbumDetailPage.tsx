@@ -135,11 +135,23 @@ const AlbumDetailPage: React.FC = () => {
       exclude: excludeExplicitness,
       setFilters: setExplicitnessFilters,
     },
+    series: {
+      include: includeSeries,
+      exclude: excludeSeries,
+      setFilters: setSeriesFilters,
+    },
+    artists: {
+      include: includeArtists,
+      exclude: excludeArtists,
+      setFilters: setArtistFilters,
+    },
   });
 
   const handleRemoveCharacterFilter = filterHandlers.handleRemoveCharacterFilter;
   const handleRemoveTagFilter = filterHandlers.handleRemoveTagFilter;
   const handleRemoveExplicitnessFilter = filterHandlers.handleRemoveExplicitnessFilter;
+  const handleRemoveSeriesFilter = filterHandlers.handleRemoveSeriesFilter;
+  const handleRemoveArtistFilter = filterHandlers.handleRemoveArtistFilter;
   const handleClearAllFilters = filterHandlers.handleClearAllFilters;
 
   const handleImageSizeChange = (newSize: 'small' | 'medium' | 'large') => {
@@ -379,7 +391,7 @@ const AlbumDetailPage: React.FC = () => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [id, sortBy, itemsPerPage, page, includeCharacters?.join(','), excludeCharacters?.join(','), includeTags?.join(','), excludeTags?.join(','), includeExplicitness?.join(','), excludeExplicitness?.join(',')]);
+  }, [id, sortBy, itemsPerPage, page, includeCharacters?.join(','), excludeCharacters?.join(','), includeTags?.join(','), excludeTags?.join(','), includeExplicitness?.join(','), excludeExplicitness?.join(','), includeSeries?.join(','), excludeSeries?.join(','), includeArtists?.join(','), excludeArtists?.join(',')]);
 
   const fetchAllTags = async () => {
     if (allTags.length > 0) return;
@@ -907,6 +919,30 @@ const AlbumDetailPage: React.FC = () => {
                 exclude.length > 0 ? exclude : undefined
               );
             }}
+            seriesFilters={[
+              ...(includeSeries || []).map(name => ({ id: 0, name, type: 'include' as const })),
+              ...(excludeSeries || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+            ]}
+            onSeriesFiltersChange={(filters) => {
+              const include = filters.filter(f => f.type === 'include').map(f => f.name);
+              const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+              setSeriesFilters(
+                include.length > 0 ? include : undefined,
+                exclude.length > 0 ? exclude : undefined
+              );
+            }}
+            artistFilters={[
+              ...(includeArtists || []).map(name => ({ id: 0, name, type: 'include' as const })),
+              ...(excludeArtists || []).map(name => ({ id: 0, name, type: 'exclude' as const }))
+            ]}
+            onArtistFiltersChange={(filters) => {
+              const include = filters.filter(f => f.type === 'include').map(f => f.name);
+              const exclude = filters.filter(f => f.type === 'exclude').map(f => f.name);
+              setArtistFilters(
+                include.length > 0 ? include : undefined,
+                exclude.length > 0 ? exclude : undefined
+              );
+            }}
             exportData={album ? {
               images: images.map(img => img.id),
               exportName: album.name,
@@ -923,9 +959,15 @@ const AlbumDetailPage: React.FC = () => {
             excludeTags={excludeTags}
             includeExplicitness={includeExplicitness}
             excludeExplicitness={excludeExplicitness}
+            includeSeries={includeSeries}
+            excludeSeries={excludeSeries}
+            includeArtists={includeArtists}
+            excludeArtists={excludeArtists}
             onRemoveCharacterFilter={handleRemoveCharacterFilter}
             onRemoveTagFilter={handleRemoveTagFilter}
             onRemoveExplicitnessFilter={handleRemoveExplicitnessFilter}
+            onRemoveSeriesFilter={handleRemoveSeriesFilter}
+            onRemoveArtistFilter={handleRemoveArtistFilter}
             onClearAllFilters={handleClearAllFilters}
           />
 
